@@ -1,0 +1,24 @@
+{
+  "name": "@nexora/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "API HTTP da NEXORA TRADING (Fastify).",
+  "type": "module",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/main.js",
+    "migrate": "node dist/db/migrate-cli.js"
+  },
+  "dependencies": {
+    "@nexora/shared": "workspace:*",
+    "fastify": "^5.6.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "typescript": "^5.6.0"
+  }
+}
