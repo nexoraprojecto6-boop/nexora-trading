@@ -1,5 +1,6 @@
+import { loadAuthConfig, type AuthConfig } from "./auth/config.js";
 import { loadDatabaseConfig, type DatabaseConfig } from "./db/config.js";
-import { ok, parseLogLevel, parseNodeEnv, parsePort, type LogLevel, type NodeEnv, type Result } from "@nexora/shared";
+import { AppError, err, ok, parseLogLevel, parseNodeEnv, parsePort, type LogLevel, type NodeEnv, type Result } from "@nexora/shared";
 
 export interface ApiConfig {
   readonly nodeEnv: NodeEnv;
@@ -8,6 +9,8 @@ export interface ApiConfig {
   readonly port: number;
   /** `undefined` quando DATABASE_URL não está definida (só permitido fora de produção). */
   readonly database: DatabaseConfig | undefined;
+  /** `undefined` quando a autenticação não está configurada (rotas /auth/* respondem 503). */
+  readonly auth: AuthConfig | undefined;
 }
 
 export type Env = Readonly<Record<string, string | undefined>>;
@@ -27,6 +30,12 @@ export function loadConfig(env: Env): Result<ApiConfig> {
   const database = loadDatabaseConfig(env, nodeEnv.value);
   if (!database.ok) return database;
 
+  const auth = loadAuthConfig(env, nodeEnv.value);
+  if (!auth.ok) return auth;
+  if (auth.value !== undefined && database.value === undefined) {
+    return err(new AppError("CONFIG", "A autenticação requer DATABASE_URL."));
+  }
+
   const host = env["API_HOST"]?.trim();
   return ok({
     nodeEnv: nodeEnv.value,
@@ -34,5 +43,6 @@ export function loadConfig(env: Env): Result<ApiConfig> {
     host: host !== undefined && host !== "" ? host : "0.0.0.0",
     port: port.value,
     database: database.value,
+    auth: auth.value,
   });
 }

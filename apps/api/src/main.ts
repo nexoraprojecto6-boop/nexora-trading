@@ -1,5 +1,7 @@
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
+import { createDerivAuthClient } from "@nexora/deriv-client";
+import { createAuthService } from "./auth/service.js";
 import { createDatabase } from "./db/pool.js";
 
 const configResult = loadConfig(process.env);
@@ -14,7 +16,14 @@ const logPoolError = (error: Error): void => {
   app.log.error({ errorName: error.name }, "Erro na ligação à base de dados");
 };
 const database = config.database !== undefined ? createDatabase(config.database, logPoolError) : undefined;
-const app = buildApp(config, database !== undefined ? { database } : {});
+const auth =
+  config.auth !== undefined && database !== undefined
+    ? createAuthService({ pool: database.pool, deriv: createDerivAuthClient(), config: config.auth })
+    : undefined;
+const app = buildApp(config, {
+  ...(database !== undefined ? { database } : {}),
+  ...(auth !== undefined ? { auth } : {}),
+});
 if (config.nodeEnv === "production" && config.database?.ssl === "disable") {
   app.log.warn("A ligação à base de dados em produção não usa TLS (DATABASE_SSL=disable).");
 }

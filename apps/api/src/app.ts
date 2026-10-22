@@ -2,12 +2,16 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { isAppError } from "@nexora/shared";
 import type { ApiConfig } from "./config.js";
 import { HTTP_STATUS_BY_CODE, codeForClientStatus } from "./http-errors.js";
+import type { AuthService } from "./auth/service.js";
+import { registerAuthRoutes } from "./routes/auth.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerReadyRoutes, type ReadinessProbe } from "./routes/ready.js";
 
 export interface AppDependencies {
   /** Base de dados (ou equivalente em testes). É fechada quando a app fecha. */
   readonly database?: ReadinessProbe & { close(): Promise<void> };
+  /** Serviço de autenticação. Sem ele, as rotas /auth/* e /me respondem 503. */
+  readonly auth?: AuthService;
 }
 
 export function buildApp(config: ApiConfig, deps: AppDependencies = {}): FastifyInstance {
@@ -57,6 +61,7 @@ export function buildApp(config: ApiConfig, deps: AppDependencies = {}): Fastify
 
   registerHealthRoutes(app);
   registerReadyRoutes(app, deps.database);
+  registerAuthRoutes(app, { service: deps.auth, config: config.auth });
   const database = deps.database;
   if (database !== undefined) app.addHook("onClose", async () => database.close());
   return app;
