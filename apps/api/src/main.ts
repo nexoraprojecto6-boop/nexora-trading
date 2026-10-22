@@ -1,5 +1,6 @@
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
+import { createDatabase } from "./db/pool.js";
 
 const configResult = loadConfig(process.env);
 if (!configResult.ok) {
@@ -8,7 +9,15 @@ if (!configResult.ok) {
   process.exit(1);
 }
 const config = configResult.value;
-const app = buildApp(config);
+const logPoolError = (error: Error): void => {
+  // Só o nome do erro: a mensagem do driver pode conter o anfitrião da base de dados.
+  app.log.error({ errorName: error.name }, "Erro na ligação à base de dados");
+};
+const database = config.database !== undefined ? createDatabase(config.database, logPoolError) : undefined;
+const app = buildApp(config, database !== undefined ? { database } : {});
+if (config.nodeEnv === "production" && config.database?.ssl === "disable") {
+  app.log.warn("A ligação à base de dados em produção não usa TLS (DATABASE_SSL=disable).");
+}
 
 let shuttingDown = false;
 async function shutdown(signal: string): Promise<void> {

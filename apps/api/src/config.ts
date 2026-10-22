@@ -1,3 +1,4 @@
+import { loadDatabaseConfig, type DatabaseConfig } from "./db/config.js";
 import { ok, parseLogLevel, parseNodeEnv, parsePort, type LogLevel, type NodeEnv, type Result } from "@nexora/shared";
 
 export interface ApiConfig {
@@ -5,6 +6,8 @@ export interface ApiConfig {
   readonly logLevel: LogLevel;
   readonly host: string;
   readonly port: number;
+  /** `undefined` quando DATABASE_URL não está definida (só permitido fora de produção). */
+  readonly database: DatabaseConfig | undefined;
 }
 
 export type Env = Readonly<Record<string, string | undefined>>;
@@ -21,11 +24,15 @@ export function loadConfig(env: Env): Result<ApiConfig> {
   const port = parsePort(env["PORT"], 3000);
   if (!port.ok) return port;
 
+  const database = loadDatabaseConfig(env, nodeEnv.value);
+  if (!database.ok) return database;
+
   const host = env["API_HOST"]?.trim();
   return ok({
     nodeEnv: nodeEnv.value,
     logLevel: logLevel.value,
     host: host !== undefined && host !== "" ? host : "0.0.0.0",
     port: port.value,
+    database: database.value,
   });
 }

@@ -3,8 +3,14 @@ import { isAppError } from "@nexora/shared";
 import type { ApiConfig } from "./config.js";
 import { HTTP_STATUS_BY_CODE, codeForClientStatus } from "./http-errors.js";
 import { registerHealthRoutes } from "./routes/health.js";
+import { registerReadyRoutes, type ReadinessProbe } from "./routes/ready.js";
 
-export function buildApp(config: ApiConfig): FastifyInstance {
+export interface AppDependencies {
+  /** Base de dados (ou equivalente em testes). É fechada quando a app fecha. */
+  readonly database?: ReadinessProbe & { close(): Promise<void> };
+}
+
+export function buildApp(config: ApiConfig, deps: AppDependencies = {}): FastifyInstance {
   const app = Fastify({
     logger: {
       level: config.logLevel,
@@ -50,5 +56,8 @@ export function buildApp(config: ApiConfig): FastifyInstance {
   });
 
   registerHealthRoutes(app);
+  registerReadyRoutes(app, deps.database);
+  const database = deps.database;
+  if (database !== undefined) app.addHook("onClose", async () => database.close());
   return app;
 }
