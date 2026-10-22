@@ -5,7 +5,7 @@
   "description": "Plataforma de trading em tempo real sobre a API oficial da Deriv.",
   "packageManager": "pnpm@9.15.0",
   "engines": {
-    "node": ">=20.11.0"
+    "node": ">=22.4.0"
   },
   "scripts": {
     "build": "turbo run build",
