@@ -1,0 +1,50 @@
+# Blueprint do Render: o ficheiro tem de se chamar render.yaml e estar na raiz do repositório.
+# Região: frankfurt (a API e a base de dados têm de estar na mesma região).
+# Plano gratuito = só para testes. Ver docs/deploy.md (limites e riscos).
+services:
+  - type: web
+    name: nexora-api
+    runtime: node
+    region: frankfurt
+    plan: free
+    # `...` inclui os pacotes de que a API depende (shared, deriv-client), compilados por ordem.
+    # --no-frozen-lockfile: enquanto não existir pnpm-lock.yaml (será gerado pelo CI).
+    buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @nexora/api... build
+    # No plano gratuito não há preDeployCommand: as migrações correm no arranque.
+    # Seguro com uma só instância (e com lock na base de dados se houver mais).
+    # Num plano pago, mover o `migrate` para preDeployCommand.
+    startCommand: pnpm --filter @nexora/api migrate && pnpm --filter @nexora/api start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nexora-db
+          property: connectionString
+      # Ligação interna do Render. Se falhar com erro de TLS/SSL, ver docs/deploy.md.
+      - key: DATABASE_SSL
+        value: no-verify
+      # Preencher no painel do Render (valores nunca vão para o Git).
+      # Preencher as 4 juntas ou nenhuma: configuração parcial impede o arranque.
+      - key: WEB_ORIGIN
+        sync: false
+      - key: DERIV_APP_ID
+        sync: false
+      - key: DERIV_OAUTH_REDIRECT_URI
+        sync: false
+      - key: APP_ENCRYPTION_KEY
+        sync: false
+
+databases:
+  - name: nexora-db
+    region: frankfurt
+    plan: free
+    databaseName: nexora
+    user: nexora
+    # Sem acesso externo: só serviços do Render na mesma região.
+    ipAllowList: []

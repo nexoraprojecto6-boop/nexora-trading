@@ -12,6 +12,7 @@
     "migrate": "node dist/db/migrate-cli.js"
   },
   "dependencies": {
+    "@fastify/cors": "^11.0.0",
     "@nexora/deriv-client": "workspace:*",
     "@nexora/shared": "workspace:*",
     "fastify": "^5.6.0",

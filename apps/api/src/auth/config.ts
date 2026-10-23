@@ -4,7 +4,7 @@ import { parseEncryptionKey } from "./crypto.js";
 export interface AuthConfig {
   /** App ID da Deriv (= `client_id` do OAuth). */
   readonly appId: string;
-  /** URL de retorno registado na Deriv. Termina sempre em /auth/callback. */
+  /** URL de retorno registado na Deriv. O caminho termina sempre em /auth/callback (admite prefixo, ex.: /api/auth/callback atrás de um proxy). */
   readonly redirectUri: string;
   /** Origem do frontend (sem barra final). Único destino de redirecionamentos pós-login. */
   readonly webOrigin: string;
@@ -66,7 +66,7 @@ export function loadAuthConfig(env: Env, nodeEnv: NodeEnv): Result<AuthConfig | 
 
   const redirect = parseHttpUrl("DERIV_OAUTH_REDIRECT_URI", values.get("DERIV_OAUTH_REDIRECT_URI") ?? "", nodeEnv);
   if (!redirect.ok) return redirect;
-  if (redirect.value.pathname !== "/auth/callback" || redirect.value.search !== "") {
+  if (!redirect.value.pathname.endsWith("/auth/callback") || redirect.value.search !== "") {
     return err(new AppError("CONFIG", "DERIV_OAUTH_REDIRECT_URI tem de terminar em /auth/callback, sem parâmetros."));
   }
 

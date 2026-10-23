@@ -20,7 +20,7 @@ const auth =
   config.auth !== undefined && database !== undefined
     ? createAuthService({ pool: database.pool, deriv: createDerivAuthClient(), config: config.auth })
     : undefined;
-const app = buildApp(config, {
+const app = await buildApp(config, {
   ...(database !== undefined ? { database } : {}),
   ...(auth !== undefined ? { auth } : {}),
 });

@@ -1,3 +1,4 @@
+import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
 import { isAppError } from "@nexora/shared";
 import type { ApiConfig } from "./config.js";
@@ -14,7 +15,7 @@ export interface AppDependencies {
   readonly auth?: AuthService;
 }
 
-export function buildApp(config: ApiConfig, deps: AppDependencies = {}): FastifyInstance {
+export async function buildApp(config: ApiConfig, deps: AppDependencies = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
       level: config.logLevel,
@@ -23,6 +24,16 @@ export function buildApp(config: ApiConfig, deps: AppDependencies = {}): Fastify
     },
     bodyLimit: 1_048_576,
   });
+
+  // CORS: só a origem do frontend, com cookies. Sem autenticação configurada não há CORS (nenhuma origem é autorizada).
+  if (config.auth !== undefined) {
+    await app.register(cors, {
+      origin: config.auth.webOrigin,
+      credentials: true,
+      methods: ["GET", "POST", "OPTIONS"],
+      maxAge: 600,
+    });
+  }
 
   // Cabeçalhos de segurança básicos para uma API JSON.
   app.addHook("onSend", async (_request, reply) => {

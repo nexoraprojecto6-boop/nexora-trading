@@ -22,8 +22,8 @@
 1. **Logout apaga as credenciais Deriv guardadas.** Para os bots operarem com o utilizador offline (fase do worker) será preciso um consentimento explícito e persistente. Decidir nessa fase.
 2. **Sem refresh de token.** O token de acesso dura cerca de 1 hora; a documentação indica `refresh_token` mas não descreve o pedido de renovação. Ficou por implementar. Hoje, depois de o token expirar, as chamadas à Deriv falham e é preciso novo login.
 3. **Formato da resposta do token** (`access_token`, `token_type`, `expires_in`, `refresh_token`, `scope`) assumido como OAuth 2.0 padrão; confirmar no primeiro login real em conta demo.
-4. **Cookies e domínios.** `SameSite=Lax` exige que frontend e API estejam no mesmo "site" (mesmo domínio registável, ex.: `app.exemplo.com` e `api.exemplo.com`) ou que a API seja servida atrás do domínio do frontend. Com domínios de plataforma diferentes (ex.: `*.vercel.app` + `*.railway.app`) o cookie não será enviado.
-5. **CORS** não está ativo. Se o frontend chamar a API a partir de outra origem, será preciso `@fastify/cors` com `origin = WEB_ORIGIN` e `credentials: true` (fase do frontend).
+4. **Cookies e domínios.** `SameSite=Lax` exige frontend e API no mesmo "site". Decisão: frontend em `nexorafore.pro` e API em `api.nexorafore.pro` (domínio personalizado no Render). Com o domínio `*.onrender.com` o cookie não seria enviado. Ver `docs/deploy.md`.
+5. **CORS** ativo quando a autenticação está configurada: só `WEB_ORIGIN`, com credenciais, métodos GET/POST/OPTIONS. O frontend usa `credentials: "include"`.
 6. **Limite de pedidos** em `/auth/login` e `/auth/callback` não existe nesta fase (cada login cria uma linha temporária, limpa oportunisticamente). Configurar limites no serviço de alojamento ou adicionar `@fastify/rate-limit`.
 7. **Rotação da chave** de cifra: o formato (`v1.`) já está versionado, mas só existe uma chave.
 
