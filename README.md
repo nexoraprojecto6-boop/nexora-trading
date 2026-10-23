@@ -2,12 +2,12 @@
 
 Plataforma de trading em tempo real, construída sobre a API oficial da Deriv (REST e WebSocket).
 
-> **Estado do projeto:** Fase 1, estrutura raiz do monorepo. Ainda não existe qualquer funcionalidade implementada.
+> **Estado do projeto:** em construção. Existem a API (health, readiness, login OAuth da Deriv), o cliente da Deriv, a base de dados com migrações e um frontend mínimo de login. **Ainda não há bots nem operações de compra.**
 
-## Âmbito desta fase
+## Âmbito atual
 
-- Estrutura de pastas e configuração raiz do monorepo.
-- Sem autenticação, OAuth, bots nem operações de compra.
+- Autenticação com a Deriv (OAuth 2.0 + PKCE), sessões e contas.
+- Sem bots nem operações de compra.
 - Sem credenciais de nenhum tipo no repositório.
 
 ## Stack
@@ -51,16 +51,24 @@ nexora-trading/
 
 Consulta o ficheiro `.env.example` para a lista de variáveis esperadas. Os valores reais nunca devem ser submetidos ao Git.
 
-## Fases previstas
+## Documentação
 
-1. Estrutura raiz do monorepo (esta fase)
-2. Pacote `shared`
-3. Pacote `deriv-client`
-4. API (`apps/api`)
-5. Base de dados e migrações
-6. Motor de bots e worker
-7. Frontend
-8. CI/CD e publicação
+- `docs/auth.md`: fluxo de autenticação e decisões de segurança.
+- `docs/deploy.md`: publicação (GitHub, Render, Vercel) e limites do plano gratuito.
+- `docs/deriv-api-notes.md`: notas verificadas sobre a API da Deriv.
+- `infrastructure/db/README.md`: base de dados e migrações.
+
+## Estado das fases
+
+1. Estrutura raiz do monorepo (feito)
+2. Pacote `shared` (feito)
+3. Pacote `deriv-client` (feito: WebSocket público e OAuth)
+4. API (feito)
+5. Base de dados e migrações (feito)
+6. Autenticação OAuth da Deriv (feito)
+7. Frontend de login e publicação (feito)
+8. CI/CD (feito)
+9. Motor de bots e worker (por fazer)
 
 ## Licença
 

@@ -52,6 +52,16 @@ Segundo a documentação do Render:
 
 Antes de qualquer utilização com dinheiro real: planos pagos para a API e a base de dados (com backups), `preDeployCommand` para migrações, e rever os pontos em aberto de `docs/auth.md`.
 
-## Lockfile
+## Lockfile e CI
 
-O `render.yaml` instala com `--no-frozen-lockfile` porque ainda não existe `pnpm-lock.yaml`. Assim que o CI o gerar e fizer commit, trocar para `pnpm install --frozen-lockfile` para builds reproduzíveis.
+O repositório inclui o `pnpm-lock.yaml`, e o Render e o CI instalam com `--frozen-lockfile` (versões exatas, builds reproduzíveis). Se alterares dependências nos `package.json`, atualiza o lockfile sem terminal:
+
+1. GitHub → separador **Actions** → **Gerar lockfile** → **Run workflow** (na branch pretendida).
+2. O workflow corre `pnpm install --lockfile-only` e faz commit do `pnpm-lock.yaml`.
+
+O workflow **CI** corre em cada pull request e em cada push para `main`: typecheck, build e testes (com um PostgreSQL descartável, sem palavra-passe). A auditoria de dependências é informativa e não bloqueia.
+
+Definições recomendadas no GitHub (*Settings*):
+- **Branches → regra para `main`**: exigir pull request e o check "Typecheck, build e testes" a passar antes de fazer merge.
+- **Code security**: ativar *Secret scanning* e *Push protection* (bloqueia o envio acidental de segredos).
+- **Actions → General → Workflow permissions**: manter "Read repository contents" por omissão (o workflow do lockfile pede a permissão de escrita só para si).

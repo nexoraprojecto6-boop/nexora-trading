@@ -8,8 +8,8 @@ services:
     region: frankfurt
     plan: free
     # `...` inclui os pacotes de que a API depende (shared, deriv-client), compilados por ordem.
-    # --no-frozen-lockfile: enquanto não existir pnpm-lock.yaml (será gerado pelo CI).
-    buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @nexora/api... build
+    # --frozen-lockfile: exige o pnpm-lock.yaml no repositório (ver docs/deploy.md).
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @nexora/api... build
     # No plano gratuito não há preDeployCommand: as migrações correm no arranque.
     # Seguro com uma só instância (e com lock na base de dados se houver mais).
     # Num plano pago, mover o `migrate` para preDeployCommand.

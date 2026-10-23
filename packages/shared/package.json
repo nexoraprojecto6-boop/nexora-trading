@@ -2,7 +2,7 @@
   "name": "@nexora/shared",
   "version": "0.0.0",
   "private": true,
-  "description": "Tipos e utilitários partilhados entre API, worker e pacotes da NEXORA TRADING.",
+  "description": "Tipos e utilit\u00e1rios partilhados entre API, worker e pacotes da NEXORA TRADING.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,10 +12,13 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test \"test/**/*.test.mjs\""
   },
   "devDependencies": {
     "typescript": "^5.6.0"

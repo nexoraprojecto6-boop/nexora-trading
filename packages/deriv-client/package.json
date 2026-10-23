@@ -2,7 +2,7 @@
   "name": "@nexora/deriv-client",
   "version": "0.0.0",
   "private": true,
-  "description": "Cliente da API oficial da Deriv (WebSocket público) para a NEXORA TRADING.",
+  "description": "Cliente da API oficial da Deriv (WebSocket p\u00fablico) para a NEXORA TRADING.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,10 +12,13 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test \"test/**/*.test.mjs\""
   },
   "dependencies": {
     "@nexora/shared": "workspace:*"
