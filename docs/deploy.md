@@ -17,16 +17,16 @@ Com `api.nexorafore.pro` os dois estão no mesmo "site" e o cookie funciona. O d
 
 ## Ordem dos passos
 
-1. **GitHub:** colocar todos os ficheiros das fases no repositório (incluindo `render.yaml` na raiz).
-2. **Chave de cifra:** gerar `APP_ENCRYPTION_KEY` com a linha da consola do browser indicada em `.env.example`. Guardar uma cópia num gestor de palavras-passe: sem ela, os tokens guardados deixam de ser legíveis.
-3. **Render:** *New → Blueprint*, escolher o repositório. O Render cria `nexora-api` e `nexora-db`. Preencher as 4 variáveis pedidas:
+1. **GitHub:** colocar todos os ficheiros das fases no repositório (incluindo `render.yaml` e `pnpm-lock.yaml` na raiz).
+2. **Render:** *New → Blueprint*, escolher o repositório. O Render cria `nexora-api` e `nexora-db` e pede 3 valores:
    - `WEB_ORIGIN` = `https://nexorafore.pro`
    - `DERIV_OAUTH_REDIRECT_URI` = `https://api.nexorafore.pro/auth/callback`
    - `DERIV_APP_ID` = App ID da tua aplicação registada na Deriv
-   - `APP_ENCRYPTION_KEY` = a chave do passo 2
-   Preenche as 4 ou nenhuma. Se deixares só algumas, a API recusa arrancar de propósito.
+   Têm de ser preenchidos os 3: se faltar algum, a API recusa arrancar de propósito.
+   A `APP_ENCRYPTION_KEY` **não precisas de criar**: o Render gera-a sozinho (valor aleatório de 256 bits, criado uma só vez).
+3. **Backup da chave:** depois do primeiro deploy, no serviço `nexora-api` → *Environment*, mostra o valor de `APP_ENCRYPTION_KEY` e guarda uma cópia num gestor de palavras-passe. Se o serviço for apagado e recriado, a chave nova não decifra os tokens antigos (os utilizadores voltam a fazer login).
 4. **Domínio da API:** no serviço `nexora-api`, *Settings → Custom Domains*, adicionar `api.nexorafore.pro` e criar no teu DNS o registo CNAME que o Render indicar. Esperar pelo certificado TLS.
-5. **Deriv:** na aplicação registada, definir o *redirect URI* exatamente igual ao do passo 3.
+5. **Deriv:** na aplicação registada, definir o *redirect URI* exatamente igual ao do passo 2 (`https://api.nexorafore.pro/auth/callback`).
 6. **Vercel:** *Add New → Project*, escolher o repositório e definir:
    - Root Directory: `apps/web`
    - Environment Variable: `VITE_API_BASE_URL` = `https://api.nexorafore.pro`

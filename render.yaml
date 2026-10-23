@@ -29,16 +29,20 @@ services:
       # Ligação interna do Render. Se falhar com erro de TLS/SSL, ver docs/deploy.md.
       - key: DATABASE_SSL
         value: no-verify
-      # Preencher no painel do Render (valores nunca vão para o Git).
-      # Preencher as 4 juntas ou nenhuma: configuração parcial impede o arranque.
+      # O Render pede estas 3 no painel ao criar o Blueprint (valores nunca vão para o Git).
+      # Têm de ser preenchidas todas: com a chave abaixo sempre definida, a autenticação
+      # fica ativa e a API recusa arrancar se faltar alguma.
       - key: WEB_ORIGIN
         sync: false
       - key: DERIV_APP_ID
         sync: false
       - key: DERIV_OAUTH_REDIRECT_URI
         sync: false
+      # Chave que cifra os tokens guardados: o Render gera um valor aleatório de 256 bits
+      # (base64) na primeira sincronização e mantém-no. Não editar nem apagar:
+      # trocar a chave torna ilegíveis os tokens já guardados (os utilizadores voltam a fazer login).
       - key: APP_ENCRYPTION_KEY
-        sync: false
+        generateValue: true
 
 databases:
   - name: nexora-db
