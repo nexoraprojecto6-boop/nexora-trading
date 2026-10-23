@@ -55,6 +55,7 @@ Consulta o ficheiro `.env.example` para a lista de variáveis esperadas. Os valo
 
 - `docs/auth.md`: fluxo de autenticação e decisões de segurança.
 - `docs/deploy.md`: publicação (GitHub, Render, Vercel) e limites do plano gratuito.
+- `docs/bots.md`: motor de bots, regras de risco e decisões em aberto.
 - `docs/deriv-api-notes.md`: notas verificadas sobre a API da Deriv.
 - `infrastructure/db/README.md`: base de dados e migrações.
 
@@ -68,7 +69,8 @@ Consulta o ficheiro `.env.example` para a lista de variáveis esperadas. Os valo
 6. Autenticação OAuth da Deriv (feito)
 7. Frontend de login e publicação (feito)
 8. CI/CD (feito)
-9. Motor de bots e worker (por fazer)
+9a. Núcleo do motor de bots: candles, estratégias e gestão de risco, sem execução (feito)
+9b. Worker e execução de operações (por fazer, ver `docs/bots.md`)
 
 ## Licença
 
