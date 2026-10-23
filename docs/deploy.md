@@ -36,6 +36,11 @@ Com `api.nexorafore.pro` os dois estão no mesmo "site" e o cookie funciona. O d
 
 Os *preview deployments* da Vercel têm outros endereços, por isso o login só funciona no domínio de produção.
 
+## Se o build falhar
+
+- `Cannot find type definition file for 'node'` (ou `typescript` não encontrado): o Render define `NODE_ENV=production` no build e o pnpm salta as devDependencies. O `buildCommand` do `render.yaml` já usa `pnpm install --frozen-lockfile --production=false` para isso.
+- Falha a falar de lockfile: falta o `pnpm-lock.yaml` no repositório.
+
 ## Se a ligação à base de dados falhar
 
 Nos logs do Render, um erro de TLS/SSL ao ligar:
