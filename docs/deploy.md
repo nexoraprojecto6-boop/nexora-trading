@@ -4,35 +4,35 @@
 
 | Parte | Onde | Endereço |
 | --- | --- | --- |
-| Frontend (`apps/web`) | Vercel | `https://nexorafore.pro` |
-| API (`apps/api`) | Render (web service) | `https://api.nexorafore.pro` (domínio personalizado) |
+| Frontend (`apps/web`) | Vercel | `https://nexoraforex.pro` |
+| API (`apps/api`) | Render (web service) | `https://api.nexoraforex.pro` (domínio personalizado) |
 | Base de dados | Render Postgres | interna, sem acesso externo |
 
-## Porque `api.nexorafore.pro` e não o domínio `*.onrender.com`
+## Porque `api.nexoraforex.pro` e não o domínio `*.onrender.com`
 
-O cookie de sessão é `SameSite=Lax`. Entre `nexorafore.pro` e `xxx.onrender.com` (sites diferentes) o browser não envia esse cookie nos pedidos do frontend à API, e muitos browsers bloqueiam cookies de terceiros. Resultado: o login parece funcionar, mas `/me` responde sempre 401.
-Com `api.nexorafore.pro` os dois estão no mesmo "site" e o cookie funciona. O domínio é teu, por isso basta um registo DNS.
+O cookie de sessão é `SameSite=Lax`. Entre `nexoraforex.pro` e `xxx.onrender.com` (sites diferentes) o browser não envia esse cookie nos pedidos do frontend à API, e muitos browsers bloqueiam cookies de terceiros. Resultado: o login parece funcionar, mas `/me` responde sempre 401.
+Com `api.nexoraforex.pro` os dois estão no mesmo "site" e o cookie funciona. O domínio é teu, por isso basta um registo DNS.
 
-**Alternativa sem domínio da API** (não recomendada): um *rewrite* na Vercel de `/api/*` para o URL do Render, com `VITE_API_BASE_URL` igual a `https://nexorafore.pro/api` e `DERIV_OAUTH_REDIRECT_URI` igual a `https://nexorafore.pro/api/auth/callback`. Funciona para HTTP, mas não para WebSockets (fase dos bots), e coloca a Vercel no caminho de todos os pedidos.
+**Alternativa sem domínio da API** (não recomendada): um *rewrite* na Vercel de `/api/*` para o URL do Render, com `VITE_API_BASE_URL` igual a `https://nexoraforex.pro/api` e `DERIV_OAUTH_REDIRECT_URI` igual a `https://nexoraforex.pro/api/auth/callback`. Funciona para HTTP, mas não para WebSockets (fase dos bots), e coloca a Vercel no caminho de todos os pedidos.
 
 ## Ordem dos passos
 
 1. **GitHub:** colocar todos os ficheiros das fases no repositório (incluindo `render.yaml` e `pnpm-lock.yaml` na raiz).
 2. **Render:** *New → Blueprint*, escolher o repositório. O Render cria `nexora-api` e `nexora-db` e pede 3 valores:
-   - `WEB_ORIGIN` = `https://nexorafore.pro`
-   - `DERIV_OAUTH_REDIRECT_URI` = `https://api.nexorafore.pro/auth/callback`
+   - `WEB_ORIGIN` = `https://nexoraforex.pro`
+   - `DERIV_OAUTH_REDIRECT_URI` = `https://api.nexoraforex.pro/auth/callback`
    - `DERIV_APP_ID` = App ID da tua aplicação registada na Deriv
    Têm de ser preenchidos os 3: se faltar algum, a API recusa arrancar de propósito.
    A `APP_ENCRYPTION_KEY` **não precisas de criar**: o Render gera-a sozinho (valor aleatório de 256 bits, criado uma só vez).
 3. **Backup da chave:** depois do primeiro deploy, no serviço `nexora-api` → *Environment*, mostra o valor de `APP_ENCRYPTION_KEY` e guarda uma cópia num gestor de palavras-passe. Se o serviço for apagado e recriado, a chave nova não decifra os tokens antigos (os utilizadores voltam a fazer login).
-4. **Domínio da API:** no serviço `nexora-api`, *Settings → Custom Domains*, adicionar `api.nexorafore.pro` e criar no teu DNS o registo CNAME que o Render indicar. Esperar pelo certificado TLS.
-5. **Deriv:** na aplicação registada, definir o *redirect URI* exatamente igual ao do passo 2 (`https://api.nexorafore.pro/auth/callback`).
+4. **Domínio da API:** no serviço `nexora-api`, *Settings → Custom Domains*, adicionar `api.nexoraforex.pro` e criar no teu DNS o registo CNAME que o Render indicar. Esperar pelo certificado TLS.
+5. **Deriv:** na aplicação registada, definir o *redirect URI* exatamente igual ao do passo 2 (`https://api.nexoraforex.pro/auth/callback`).
 6. **Vercel:** *Add New → Project*, escolher o repositório e definir:
    - Root Directory: `apps/web`
-   - Environment Variable: `VITE_API_BASE_URL` = `https://api.nexorafore.pro`
+   - Environment Variable: `VITE_API_BASE_URL` = `https://api.nexoraforex.pro`
    - Node.js Version: 22.x
-   Depois, em *Domains*, adicionar `nexorafore.pro` e seguir os registos DNS que a Vercel indicar.
-7. **Testar** com uma conta **demo**: abrir `https://nexorafore.pro`, "Entrar com a Deriv", autorizar, e confirmar que as contas aparecem.
+   Depois, em *Domains*, adicionar `nexoraforex.pro` e seguir os registos DNS que a Vercel indicar.
+7. **Testar** com uma conta **demo**: abrir `https://nexoraforex.pro`, "Entrar com a Deriv", autorizar, e confirmar que as contas aparecem.
 
 Os *preview deployments* da Vercel têm outros endereços, por isso o login só funciona no domínio de produção.
 

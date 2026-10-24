@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { createApiClient, normalizeApiBase } from "../.test-out/api.js";
 
-assert.equal(normalizeApiBase("https://api.nexorafore.pro/"), "https://api.nexorafore.pro");
-assert.equal(normalizeApiBase("https://api.nexorafore.pro"), "https://api.nexorafore.pro");
+assert.equal(normalizeApiBase("https://api.nexoraforex.pro/"), "https://api.nexoraforex.pro");
+assert.equal(normalizeApiBase("https://api.nexoraforex.pro"), "https://api.nexoraforex.pro");
 assert.equal(normalizeApiBase("http://localhost:3000"), "http://localhost:3000");
-assert.equal(normalizeApiBase("http://api.nexorafore.pro"), undefined);   // http fora de localhost
+assert.equal(normalizeApiBase("http://api.nexoraforex.pro"), undefined);   // http fora de localhost
 assert.equal(normalizeApiBase("javascript:alert(1)"), undefined);
 assert.equal(normalizeApiBase("https://u:p@x.pro"), undefined);
 assert.equal(normalizeApiBase("https://x.pro/?a=1"), undefined);

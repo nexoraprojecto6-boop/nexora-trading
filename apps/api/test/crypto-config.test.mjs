@@ -42,7 +42,7 @@ for (const [k, v, re] of [
   ["APP_ENCRYPTION_KEY", "curta", /32 bytes/],
 ]) { const r = loadAuthConfig({ ...good, [k]: v }, "production"); assert.equal(r.ok, false, k); assert.match(r.error.message, re); assert.ok(!r.error.message.includes(v) || k === "DERIV_APP_ID" ? true : true); }
 assert.equal(loadAuthConfig({ ...good, WEB_ORIGIN: "http://localhost:5173", DERIV_OAUTH_REDIRECT_URI: "http://localhost:3000/auth/callback" }, "development").ok, true);
-assert.equal(loadAuthConfig({ ...good, DERIV_OAUTH_REDIRECT_URI: "https://nexorafore.pro/api/auth/callback" }, "production").ok, true); // atrás de proxy com prefixo
+assert.equal(loadAuthConfig({ ...good, DERIV_OAUTH_REDIRECT_URI: "https://nexoraforex.pro/api/auth/callback" }, "production").ok, true); // atrás de proxy com prefixo
 const partial = loadAuthConfig({ DERIV_APP_ID: "1" }, "development"); assert.equal(partial.ok, false); assert.match(partial.error.message, /DERIV_OAUTH_REDIRECT_URI/);
 assert.equal(loadConfig({ ...good }).ok, false);   // auth sem DATABASE_URL
 assert.equal(loadConfig({ ...good, DATABASE_URL: URL_ }).ok, true);
