@@ -11,7 +11,7 @@ services:
     # --frozen-lockfile: exige o pnpm-lock.yaml no repositório (ver docs/deploy.md).
     # --production=false: o Render define NODE_ENV=production também no build, e sem esta opção o pnpm
     # não instala as devDependencies (typescript, @types/node) de que o build precisa.
-    buildCommand: corepack enable && pnpm install --frozen-lockfile --production=false && pnpm --filter @nexora/api... build
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --production=false --production=false && pnpm --filter @nexora/api... build
     # No plano gratuito não há preDeployCommand: as migrações correm no arranque.
     # Seguro com uma só instância (e com lock na base de dados se houver mais).
     # Num plano pago, mover o `migrate` para preDeployCommand.
