@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createApiClient, normalizeApiBase, type SessionState } from "./api";
+import { cspViolations, diagnose } from "./diagnostics";
 
 type ViewState = { readonly kind: "loading" } | SessionState;
 
@@ -19,6 +20,21 @@ export default function App() {
   const [state, setState] = useState<ViewState>({ kind: "loading" });
   const [loginFailed] = useState(readLoginError);
   const [busy, setBusy] = useState(false);
+  const [details, setDetails] = useState<string[] | undefined>(undefined);
+
+  const showDetails = async () => {
+    if (base === undefined) return;
+    setDetails(["A testar…"]);
+    setDetails(
+      await diagnose({
+        base,
+        pageOrigin: window.location.origin,
+        buildTime: __BUILD_TIME__,
+        fetchFn: (...args) => fetch(...args),
+        violations: cspViolations,
+      }),
+    );
+  };
 
   const load = useCallback(async () => {
     if (client === undefined) return;
@@ -64,6 +80,8 @@ export default function App() {
         <section>
           <p role="alert" className="notice error">{state.message}</p>
           <button type="button" onClick={() => void load()}>Tentar novamente</button>
+          <button type="button" className="secondary" onClick={() => void showDetails()}>Ver detalhes técnicos</button>
+          {details !== undefined && <pre className="details">{details.join("\n")}</pre>}
         </section>
       )}
 
@@ -94,6 +112,7 @@ export default function App() {
           <button type="button" onClick={() => void onLogout()} disabled={busy}>Terminar sessão</button>
         </section>
       )}
+      <footer className="version">Versão {__BUILD_TIME__}</footer>
     </main>
   );
 }

@@ -36,3 +36,6 @@ button:disabled { opacity: 0.6; cursor: progress; }
 .badge { font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
 .badge.demo { color: var(--accent); border-color: var(--accent); }
 .badge.real { color: var(--danger); border-color: var(--danger); }
+.button.secondary, button.secondary { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+.details { margin: 0; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; white-space: pre-wrap; word-break: break-word; font-size: 0.8rem; color: var(--muted); }
+.version { color: var(--muted); font-size: 0.75rem; }

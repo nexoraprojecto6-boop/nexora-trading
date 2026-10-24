@@ -8,5 +8,5 @@
     "rootDir": "src",
     "types": []
   },
-  "include": ["src/api.ts"]
+  "include": ["src/api.ts", "src/diagnostics.ts"]
 }

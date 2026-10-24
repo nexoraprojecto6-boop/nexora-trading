@@ -36,6 +36,11 @@ Com `api.nexoraforex.pro` os dois estão no mesmo "site" e o cookie funciona. O 
 
 Os *preview deployments* da Vercel têm outros endereços, por isso o login só funciona no domínio de produção.
 
+## O site mostra "Não foi possível contactar o servidor"
+
+- **`WEB_ORIGIN` tem de ser igual ao endereço que aparece na barra do browser.** Se a Vercel redireciona `nexoraforex.pro` para `www.nexoraforex.pro`, usa `https://www.nexoraforex.pro`. Com a origem errada, o browser bloqueia a resposta da API (CORS).
+- O `apps/web/vercel.json` não define `Content-Security-Policy` de propósito: uma política presa a um domínio bloqueou a ligação à API quando o domínio mudou. Os restantes cabeçalhos de segurança mantêm-se. Se quiseres voltar a ter CSP, acrescenta-a só depois de confirmar o domínio final.
+
 ## Se o build falhar
 
 - `Cannot find type definition file for 'node'` (ou `typescript` não encontrado): o Render define `NODE_ENV=production` no build e o pnpm salta as devDependencies. O `buildCommand` do `render.yaml` já usa `pnpm install --frozen-lockfile --production=false` para isso.
