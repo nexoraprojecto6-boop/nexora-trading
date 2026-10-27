@@ -2,7 +2,7 @@
 
 Plataforma de trading em tempo real, construída sobre a API oficial da Deriv (REST e WebSocket).
 
-> **Estado do projeto:** em construção. Existem a API (health, readiness, login OAuth da Deriv), o cliente da Deriv, a base de dados com migrações e um frontend mínimo de login. **Ainda não há bots nem operações de compra.**
+> **Estado do projeto:** em construção. Existem a API (health, readiness, login OAuth da Deriv), o cliente da Deriv, a base de dados com migrações e um frontend mínimo de login. **Ainda não há execução de bots nem operações de compra.**
 
 ## Âmbito atual
 
@@ -55,6 +55,7 @@ Consulta o ficheiro `.env.example` para a lista de variáveis esperadas. Os valo
 
 - `docs/auth.md`: fluxo de autenticação e decisões de segurança.
 - `docs/deploy.md`: publicação (GitHub, Render, Vercel) e limites do plano gratuito.
+- `docs/frontend.md`: painel (reaproveitado do projeto antigo), o que mudou e como ligar funcionalidades futuras.
 - `docs/bots.md`: motor de bots, regras de risco e decisões em aberto.
 - `docs/deriv-api-notes.md`: notas verificadas sobre a API da Deriv.
 - `infrastructure/db/README.md`: base de dados e migrações.
@@ -68,6 +69,7 @@ Consulta o ficheiro `.env.example` para a lista de variáveis esperadas. Os valo
 5. Base de dados e migrações (feito)
 6. Autenticação OAuth da Deriv (feito)
 7. Frontend de login e publicação (feito)
+7b. Painel reaproveitado do projeto antigo, ligado à nossa API (feito, ver `docs/frontend.md`)
 8. CI/CD (feito)
 9a. Núcleo do motor de bots: candles, estratégias e gestão de risco, sem execução (feito)
 9b. Worker e execução de operações (por fazer, ver `docs/bots.md`)
