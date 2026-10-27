@@ -30,6 +30,7 @@ Com `api.nexoraforex.pro` os dois estão no mesmo "site" e o cookie funciona. O 
 6. **Vercel:** *Add New → Project*, escolher o repositório e definir:
    - Root Directory: `apps/web`
    - Environment Variable: `VITE_API_BASE_URL` = `https://api.nexoraforex.pro`
+   - Environment Variable (opcional): `VITE_DERIV_AFFILIATE_TOKEN` = o teu token de afiliado da Deriv
    - Node.js Version: 22.x
    Depois, em *Domains*, adicionar `nexoraforex.pro` e seguir os registos DNS que a Vercel indicar.
 7. **Testar** com uma conta **demo**: abrir `https://nexoraforex.pro`, "Entrar com a Deriv", autorizar, e confirmar que as contas aparecem.

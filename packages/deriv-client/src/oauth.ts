@@ -16,6 +16,10 @@ export interface AuthorizeUrlParams {
   readonly state: string;
   /** BASE64URL(SHA256(code_verifier)). */
   readonly codeChallenge: string;
+  /** `registration` mostra o formulário de criação de conta em vez do login. */
+  readonly prompt?: "registration";
+  /** Atribuição de parceiro (só se aplica com `prompt: "registration"`). */
+  readonly affiliate?: { readonly token: string; readonly campaign: string };
 }
 
 export function buildAuthorizeUrl(params: AuthorizeUrlParams): string {
@@ -27,6 +31,16 @@ export function buildAuthorizeUrl(params: AuthorizeUrlParams): string {
   url.searchParams.set("state", params.state);
   url.searchParams.set("code_challenge", params.codeChallenge);
   url.searchParams.set("code_challenge_method", "S256");
+  if (params.prompt === "registration") {
+    url.searchParams.set("prompt", "registration");
+    if (params.affiliate !== undefined) {
+      // Mesmos parâmetros do link de afiliado da Deriv (a documentação pede um só nome para o token).
+      url.searchParams.set("t", params.affiliate.token);
+      url.searchParams.set("utm_campaign", params.affiliate.campaign);
+      url.searchParams.set("utm_medium", "affiliate");
+      url.searchParams.set("utm_source", params.affiliate.token);
+    }
+  }
   return url.toString();
 }
 
@@ -44,6 +58,8 @@ export interface DerivAccount {
   readonly accountType: "demo" | "real";
   readonly currency: string;
   readonly status: "active" | "inactive";
+  /** Saldo atual, quando a Deriv o devolve. Nunca é guardado na base de dados. */
+  readonly balance?: number;
 }
 
 export interface ExchangeCodeInput {
@@ -162,7 +178,7 @@ export function createDerivAuthClient(options: DerivAuthClientOptions = {}): Der
       const accounts: DerivAccount[] = [];
       for (const item of data as unknown[]) {
         if (!isRecord(item)) return err(new AppError("UPSTREAM", "Conta da Deriv inválida."));
-        const { account_id: accountId, account_type: accountType, currency, status } = item;
+        const { account_id: accountId, account_type: accountType, currency, status, balance } = item;
         if (
           typeof accountId !== "string" || accountId === "" ||
           (accountType !== "demo" && accountType !== "real") ||
@@ -171,7 +187,14 @@ export function createDerivAuthClient(options: DerivAuthClientOptions = {}): Der
         ) {
           return err(new AppError("UPSTREAM", "Conta da Deriv com campos inválidos."));
         }
-        accounts.push({ accountId, accountType, currency, status });
+        const parsedBalance = typeof balance === "number" ? balance : typeof balance === "string" && balance.trim() !== "" ? Number(balance) : Number.NaN;
+        accounts.push({
+          accountId,
+          accountType,
+          currency,
+          status,
+          ...(Number.isFinite(parsedBalance) ? { balance: parsedBalance } : {}),
+        });
       }
       return ok(accounts);
     },

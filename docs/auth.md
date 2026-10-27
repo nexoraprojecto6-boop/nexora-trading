@@ -5,8 +5,10 @@
 1. `GET /auth/login`: gera `state` e PKCE (S256), guarda-os (hash do state; verifier cifrado) e redireciona para a Deriv com `scope=trade`. Define o cookie `nx_oauth` (nonce) que liga a tentativa a este browser.
 2. A Deriv redireciona para `GET /auth/callback?code=...&state=...`.
 3. A API consome a tentativa (uso único), confirma que o cookie corresponde, troca o `code` **no backend**, obtém as contas (`GET /trading/v1/options/accounts`) e abre a sessão.
-4. Redireciona sempre para `WEB_ORIGIN` (`/` em sucesso, `/?auth=error` em qualquer falha, sem detalhes). Nunca existe redirecionamento para um destino vindo do pedido.
-5. `GET /me` devolve o utilizador e as contas. `POST /auth/logout` termina a sessão (exige `Origin` igual a `WEB_ORIGIN`).
+4. Redireciona sempre para `WEB_ORIGIN/callback` (sucesso) ou `WEB_ORIGIN/callback?error=access_denied|login_failed` (falha, sem detalhes). Nunca existe redirecionamento para um destino vindo do pedido, nem se repete texto do pedido.
+5. `GET /auth/login?prompt=registration` abre o registo de conta na Deriv (com a atribuição de afiliado, se `DERIV_AFFILIATE_TOKEN` estiver definido).
+6. `GET /me` devolve o utilizador e as contas; `GET /me/accounts` devolve-as com o saldo atual (via Deriv; `live:false` se o token da Deriv expirou); `GET /online-count` devolve as sessões ativas nos últimos 5 minutos.
+7. `GET /me` `POST /auth/logout` termina a sessão (exige `Origin` igual a `WEB_ORIGIN`).
 
 ## Decisões de segurança
 

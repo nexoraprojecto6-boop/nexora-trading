@@ -24,11 +24,23 @@ assert.equal((await createDerivAuthClient({ fetch: jr(200, { token_type: "bearer
 assert.equal((await createDerivAuthClient({ fetch: jr(200, { access_token: "x", token_type: "mac" }) }).exchangeCode(input)).ok, false);
 assert.equal((await createDerivAuthClient({ fetch: jr(500, {}) }).exchangeCode(input)).error.code, "UPSTREAM");
 cl = createDerivAuthClient({ fetch: async (u, init) => { seen = { u, init }; return jr(200, { data: [{ account_id: "CR1", account_type: "real", currency: "USD", status: "active", balance: 5 }, { account_id: "VRTC1", account_type: "demo", currency: "USD", status: "active", balance: 10000 }] })(); } });
-let ls = await cl.listAccounts("AT-SEGREDO"); assert.deepEqual(ls.value, [{ accountId: "CR1", accountType: "real", currency: "USD", status: "active" }, { accountId: "VRTC1", accountType: "demo", currency: "USD", status: "active" }]);
+let ls = await cl.listAccounts("AT-SEGREDO"); assert.deepEqual(ls.value, [{ accountId: "CR1", accountType: "real", currency: "USD", status: "active", balance: 5 }, { accountId: "VRTC1", accountType: "demo", currency: "USD", status: "active", balance: 10000 }]);
 assert.equal(seen.u, "https://api.derivws.com/trading/v1/options/accounts"); assert.equal(seen.init.headers.Authorization, "Bearer AT-SEGREDO");
 assert.equal((await createDerivAuthClient({ fetch: jr(401, {}) }).listAccounts("x")).error.code, "UNAUTHORIZED");
 assert.equal((await createDerivAuthClient({ fetch: jr(403, {}) }).listAccounts("x")).error.code, "FORBIDDEN");
 assert.equal((await createDerivAuthClient({ fetch: jr(200, { data: [{ account_id: "A", account_type: "xxx" }] }) }).listAccounts("x")).ok, false);
 
 
+
+// saldo: número, texto numérico ou ausente/ inválido (nunca falha a lista, nunca inventa)
+const bal = async (balance) => (await createDerivAuthClient({ fetch: jr(200, { data: [{ account_id: "A", account_type: "demo", currency: "USD", status: "active", ...(balance === undefined ? {} : { balance }) }] }) }).listAccounts("x")).value[0];
+assert.equal((await bal(12.5)).balance, 12.5); assert.equal((await bal("100.25")).balance, 100.25); assert.equal((await bal(0)).balance, 0);
+for (const bad of [undefined, null, "", "  ", "abc", {}, [], NaN, Infinity]) assert.equal("balance" in (await bal(bad)), false, `balance inválido: ${String(bad)}`);
+
+// registo ("Criar conta"): só com prompt=registration; a atribuição de afiliado só vai com o registo
+const reg = new URL(buildAuthorizeUrl({ clientId: "1", redirectUri: good.DERIV_OAUTH_REDIRECT_URI, scopes: ["trade"], state: "s", codeChallenge: "c", prompt: "registration", affiliate: { token: "afiliado_TOKEN_123", campaign: "NEXORA" } }));
+assert.equal(reg.searchParams.get("prompt"), "registration"); assert.equal(reg.searchParams.get("t"), "afiliado_TOKEN_123");
+assert.deepEqual([reg.searchParams.get("utm_campaign"), reg.searchParams.get("utm_medium"), reg.searchParams.get("utm_source")], ["NEXORA", "affiliate", "afiliado_TOKEN_123"]);
+const login = new URL(buildAuthorizeUrl({ clientId: "1", redirectUri: good.DERIV_OAUTH_REDIRECT_URI, scopes: ["trade"], state: "s", codeChallenge: "c", affiliate: { token: "afiliado_TOKEN_123", campaign: "NEXORA" } }));
+for (const k of ["prompt", "t", "utm_campaign", "utm_medium", "utm_source"]) assert.equal(login.searchParams.has(k), false, `login normal não leva ${k}`);
 console.log("OK: cliente OAuth da Deriv");
