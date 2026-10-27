@@ -2,7 +2,7 @@
   "name": "@nexora/web",
   "version": "0.0.0",
   "private": true,
-  "description": "Frontend da NEXORA TRADING (React + Vite).",
+  "description": "Frontend da NEXORA TRADING (React + Vite): painel, bots e ligação à Deriv.",
   "type": "module",
   "engines": {
     "node": "22.x"
@@ -11,16 +11,23 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "preview": "vite preview",
-    "test": "tsc -p tsconfig.test.json && node --test \"test/**/*.test.mjs\""
+    "test": "node --test \"test/**/*.test.mjs\""
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.1.0",
+    "@fontsource-variable/geist-mono": "^5.1.0",
+    "@fontsource-variable/space-grotesk": "^5.1.0",
+    "country-flag-icons": "^1.5.13",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-icons": "^5.3.0",
+    "react-router-dom": "^6.30.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^6.0.0",
+    "jsdom": "^25.0.0",
     "typescript": "^5.6.0",
     "vite": "^8.0.0"
   }
