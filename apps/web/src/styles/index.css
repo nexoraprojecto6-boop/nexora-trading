@@ -1,0 +1,396 @@
+/* ============================================================
+   NEXORA — Design System (mobile-first)
+   · Cantos quase retos (2–4px), superfícies planas, bordas finas
+   · Cores de plataforma de trading: verde/vermelho reais, azul de marca
+   · Botões de tamanho normal (36–40px), alvos de toque seguros
+   · Fontes (via @fontsource, importadas no main.tsx):
+       títulos  → Space Grotesk
+       texto    → Geist
+       números  → Geist Mono
+   ============================================================ */
+
+:root {
+  color-scheme: dark;
+
+  /* Superfícies — grafite neutro, sem tom roxo */
+  --bg:            #0a0c0f;
+  --bg-elevated:   #0f1217;
+  --bg-card:       #14181f;
+  --bg-card-hi:    #1b2029;
+  --border:        #232a35;
+  --border-hi:     #313a48;
+
+  /* Marca */
+  --blue:          #2563eb;
+  --blue-hi:       #4f8bff;
+  --blue-dim:      #1e3a8a;
+  --blue-glow:     rgba(79, 139, 255, 0.25);
+
+  /* Mercado: lucro / perda */
+  --green:         #0ecb81;
+  --green-dim:     rgba(14, 203, 129, 0.14);
+  --red:           #e5384f;
+  --red-hi:        #f6465d;
+  --red-dim:       rgba(246, 70, 93, 0.14);
+  --red-glow:      rgba(246, 70, 93, 0.25);
+  --amber:         #f0b90b;
+
+  /* Texto */
+  --white:         #ffffff;
+  --text:          #eaecef;
+  --text-dim:      #b7bdc6;
+  --text-faint:    #7e8896;
+
+  /* Compat (usados por componentes existentes) */
+  --glass-bg:        #14181f;
+  --glass-bg-hi:     #1b2029;
+  --glass-border:    #232a35;
+  --glass-border-hi: rgba(79, 139, 255, 0.45);
+  --glass-shadow:    none;
+
+  /* Tipografia */
+  --font-display:  'Space Grotesk Variable', 'Geist Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-body:     'Geist Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:     'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Raios — quase quadrado */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+
+  /* Safe-area */
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+html, body, #root { height: 100%; }
+
+body {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
+::selection { background: rgba(79, 139, 255, 0.35); color: #fff; }
+::placeholder { color: var(--text-faint); opacity: 1; }
+
+/* ============================================================
+   FUNDO fixo atrás de #root
+   ============================================================ */
+.space-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.space-base {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 70% 40% at 50% -8%, rgba(37, 99, 235, 0.12) 0%, transparent 65%),
+    linear-gradient(180deg, #0c0f13 0%, #0a0c0f 60%, #080a0c 100%);
+}
+.space-stars {
+  position: absolute; inset: 0; opacity: 0.45;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 15%, #000 0%, transparent 75%);
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 15%, #000 0%, transparent 75%);
+}
+.space-glitch { display: none; }
+
+#root { position: relative; z-index: 3; min-height: 100dvh; }
+
+/* ============================================================
+   TIPOGRAFIA
+   ============================================================ */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+/* Números: Geist Mono, dígitos de largura fixa */
+.tabular, .num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums slashed-zero;
+  letter-spacing: -0.02em;
+}
+
+.logo-text {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--white);
+}
+
+/* ============================================================
+   CONTROLOS BASE
+   ============================================================ */
+button {
+  font-family: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button:disabled { cursor: not-allowed; }
+
+input, select { font-family: inherit; font-size: inherit; color: inherit; }
+input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* iOS faz zoom em campos <16px e desalinha a página */
+@media (max-width: 1023px) {
+  input, select { font-size: 16px !important; }
+}
+
+a { color: inherit; text-decoration: none; }
+
+:focus-visible { outline: 2px solid var(--blue-hi); outline-offset: 2px; }
+button:focus:not(:focus-visible) { outline: none; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+* { scrollbar-width: thin; scrollbar-color: var(--border-hi) transparent; }
+
+/* ── Botão primário ── */
+.btn-primary {
+  background: var(--blue);
+  color: var(--white);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.15s ease, transform 0.08s ease, opacity 0.15s ease;
+}
+.btn-primary:hover:not(:disabled) { background: #1d4fd0; }
+.btn-primary:active:not(:disabled) { transform: scale(0.985); }
+.btn-primary:disabled { opacity: 0.45; }
+
+.btn-danger {
+  background: var(--red-hi);
+  color: var(--white);
+  font-weight: 600;
+  font-size: 14px;
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: var(--radius-md);
+}
+
+/* ── Botão secundário ── */
+.btn-ghost {
+  background: var(--bg-card-hi);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  min-height: 36px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+}
+.btn-ghost:hover:not(:disabled) { background: #222835; border-color: var(--border-hi); }
+.btn-ghost:active:not(:disabled) { transform: scale(0.985); }
+
+/* Botões compactos do header */
+.hdr-btn {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* ── Card ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  max-width: 100%;
+}
+
+/* ── Animações ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fade-in 0.28s ease forwards; }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.dot.live { background: var(--green); animation: pulse-dot 1.4s ease-in-out infinite; }
+.dot.off  { background: var(--red-hi); }
+.dot.warn { background: var(--amber); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* ── Marca ── */
+.brand { display: inline-flex; align-items: center; gap: 0.55em; line-height: 1; }
+.brand-mark { flex-shrink: 0; }
+.brand-text {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--white);
+  white-space: nowrap;
+}
+.brand-text--lg { font-size: clamp(22px, 6.5vw, 30px); letter-spacing: 0.1em; }
+.brand-text--md { font-size: clamp(16px, 4.4vw, 19px); letter-spacing: 0.1em; }
+.brand-text--sm { font-size: clamp(14px, 3.8vw, 16px); letter-spacing: 0.1em; }
+
+/* ============================================================
+   GRÁFICO DE DÍGITOS — mobile primeiro
+   ============================================================ */
+.chart-bars-wrap { --chart-h: 118px; --chart-bar-max: 80px; height: var(--chart-h); }
+@media (min-width: 481px) { .chart-bars-wrap { --chart-h: 150px; --chart-bar-max: 108px; } }
+@media (min-width: 1024px) { .chart-bars-wrap { --chart-h: 220px; --chart-bar-max: 170px; } }
+
+.controls-grid { gap: 8px; }
+.stats-strip { gap: 10px; padding: 8px 10px; flex-wrap: wrap; }
+
+/* ============================================================
+   DASHBOARD — o scroll mobile tem de vencer o overflow:hidden inline
+   ============================================================ */
+@media (max-width: 1023px) {
+  .dash-main {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(var(--safe-bottom) + 8px) !important;
+  }
+  .dash-trades { min-height: 260px !important; }
+}
+
+/* ============================================================
+   MODAIS — SEMPRE centrados no ecrã (mobile e desktop)
+   Nunca passam da altura visível; o corpo rola por dentro.
+   ============================================================ */
+.glass-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  background: rgba(5, 7, 9, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--safe-top) + 16px) 16px calc(var(--safe-bottom) + 16px);
+  animation: glass-fade 0.2s ease;
+}
+@keyframes glass-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.glass-sheet {
+  width: 100%;
+  max-width: 400px;
+  max-height: calc(100dvh - 32px - var(--safe-top) - var(--safe-bottom));
+  margin: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: glass-sheet-pop 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes glass-sheet-pop {
+  from { transform: scale(0.97); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.glass-sheet-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-shrink: 0;
+}
+
+.glass-sheet-body {
+  padding: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.glass-option {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  min-height: 48px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+.glass-option + .glass-option { margin-top: 4px; }
+.glass-option:hover { background: var(--bg-card-hi); border-color: var(--border); }
+.glass-option.active { background: rgba(79, 139, 255, 0.12); border-color: rgba(79, 139, 255, 0.5); }
+
+.glass-sheet-loader {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 36px 20px;
+}
+
+/* Banner de notificação — centrado */
+.glass-banner {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 500;
+  width: min(calc(100vw - 32px), 400px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-hi);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  animation: glass-drop 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes glass-drop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.glass-banner-close {
+  color: var(--text-faint);
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.glass-banner-close:hover { color: var(--text); background: rgba(255, 255, 255, 0.08); }
+
+/* ── Desktop: um pouco mais de respiro ── */
+@media (min-width: 1024px) {
+  body { font-size: 14px; }
+  .glass-sheet { max-width: 440px; }
+}

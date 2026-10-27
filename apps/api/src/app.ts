@@ -4,7 +4,9 @@ import { isAppError } from "@nexora/shared";
 import type { ApiConfig } from "./config.js";
 import { HTTP_STATUS_BY_CODE, codeForClientStatus } from "./http-errors.js";
 import type { AuthService } from "./auth/service.js";
+import type { BotService } from "./bots/service.js";
 import { registerAuthRoutes } from "./routes/auth.js";
+import { registerBotRoutes } from "./routes/bots.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerReadyRoutes, type ReadinessProbe } from "./routes/ready.js";
 
@@ -13,6 +15,8 @@ export interface AppDependencies {
   readonly database?: ReadinessProbe & { close(): Promise<void> };
   /** Serviço de autenticação. Sem ele, as rotas /auth/* e /me respondem 503. */
   readonly auth?: AuthService;
+  /** Catálogo e configuração de bots. Sem ele, as rotas de bots respondem 503. */
+  readonly bots?: BotService;
 }
 
 export async function buildApp(config: ApiConfig, deps: AppDependencies = {}): Promise<FastifyInstance> {
@@ -23,6 +27,9 @@ export async function buildApp(config: ApiConfig, deps: AppDependencies = {}): P
       redact: ["req.headers.authorization", "req.headers.cookie", "res.headers['set-cookie']"],
     },
     bodyLimit: 1_048_576,
+    // Validação estrita: o Fastify, por omissão, apaga campos a mais e converte tipos em silêncio.
+    // Aqui um pedido com campos desconhecidos ou tipos errados é recusado com 400.
+    ajv: { customOptions: { removeAdditional: false, coerceTypes: false, useDefaults: false, allErrors: false } },
   });
 
   // CORS: só a origem do frontend, com cookies. Sem autenticação configurada não há CORS (nenhuma origem é autorizada).
@@ -30,7 +37,7 @@ export async function buildApp(config: ApiConfig, deps: AppDependencies = {}): P
     await app.register(cors, {
       origin: config.auth.webOrigin,
       credentials: true,
-      methods: ["GET", "POST", "OPTIONS"],
+      methods: ["GET", "POST", "PUT", "OPTIONS"],
       maxAge: 600,
     });
   }
@@ -73,6 +80,7 @@ export async function buildApp(config: ApiConfig, deps: AppDependencies = {}): P
   registerHealthRoutes(app);
   registerReadyRoutes(app, deps.database);
   registerAuthRoutes(app, { service: deps.auth, config: config.auth });
+  registerBotRoutes(app, { auth: deps.auth, authConfig: config.auth, bots: deps.bots });
   const database = deps.database;
   if (database !== undefined) app.addHook("onClose", async () => database.close());
   return app;

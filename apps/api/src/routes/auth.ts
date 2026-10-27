@@ -8,6 +8,12 @@ export interface AuthRouteDeps {
   readonly config: AuthConfig | undefined;
 }
 
+const loginQuerySchema = {
+  type: "object",
+  additionalProperties: true,
+  properties: { prompt: { type: "string", enum: ["registration"] } },
+} as const;
+
 const callbackQuerySchema = {
   type: "object",
   additionalProperties: true,
@@ -30,9 +36,9 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthRouteDeps): v
     return parseCookies(request.headers.cookie)[cookieNames(auth.cookieSecure).session];
   }
 
-  app.get("/auth/login", async (_request, reply) => {
+  app.get<{ Querystring: { prompt?: "registration" } }>("/auth/login", { schema: { querystring: loginQuerySchema } }, async (request, reply) => {
     if (service === undefined || config === undefined) return notConfigured(reply);
-    const started = await service.startLogin();
+    const started = await service.startLogin({ registration: request.query.prompt === "registration" });
     if (!started.ok) throw started.error;
     const names = cookieNames(config.cookieSecure);
     // O cookie liga esta tentativa de login a este browser (defesa contra login CSRF).
@@ -50,13 +56,15 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthRouteDeps): v
       if (service === undefined || config === undefined) return notConfigured(reply);
       const names = cookieNames(config.cookieSecure);
       const cookies = parseCookies(request.headers.cookie);
-      const failure = `${config.webOrigin}/?auth=error`;
+      // O frontend (página /callback) mostra o resultado. Nunca se repete texto vindo do pedido.
+      const failure = `${config.webOrigin}/callback?error=login_failed`;
+      const denied = `${config.webOrigin}/callback?error=access_denied`;
       const clearOauth = clearCookie(names.oauth, config.cookieSecure);
 
       const { code, state, error } = request.query;
       if (error !== undefined || code === undefined || state === undefined) {
         reply.header("Set-Cookie", clearOauth);
-        return reply.redirect(failure, 302);
+        return reply.redirect(error === "access_denied" ? denied : failure, 302);
       }
 
       const completed = await service.completeLogin({ code, state, browserNonce: cookies[names.oauth] ?? "" });
@@ -69,7 +77,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthRouteDeps): v
         serializeCookie(names.session, completed.value.sessionToken, { maxAgeSeconds: config.sessionTtlSeconds, secure: config.cookieSecure }),
         clearOauth,
       ]);
-      return reply.redirect(`${config.webOrigin}/`, 302);
+      return reply.redirect(`${config.webOrigin}/callback`, 302);
     },
   );
 
@@ -82,6 +90,41 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthRouteDeps): v
       return reply.status(401).send({ error: { code: "UNAUTHORIZED", message: "Sessão inexistente ou expirada." } });
     }
     return { user: { id: session.value.userId, accounts: session.value.accounts } };
+  });
+
+  app.get("/me/accounts", async (request, reply) => {
+    if (service === undefined || config === undefined) return notConfigured(reply);
+    const token = sessionTokenOf(request, config);
+    const session = token === undefined ? undefined : await service.getSession(token);
+    if (session !== undefined && !session.ok) throw session.error;
+    if (session === undefined || session.value === null) {
+      return reply.status(401).send({ error: { code: "UNAUTHORIZED", message: "Sessão inexistente ou expirada." } });
+    }
+    const view = await service.getAccountsView(session.value.userId);
+    if (!view.ok) throw view.error;
+    return {
+      live: view.value.live,
+      accounts: view.value.accounts.map((account) => ({
+        accountId: account.accountId,
+        accountType: account.accountType,
+        currency: account.currency,
+        status: account.status,
+        balance: account.balance ?? null,
+      })),
+    };
+  });
+
+  app.get("/online-count", async (request, reply) => {
+    if (service === undefined || config === undefined) return notConfigured(reply);
+    const token = sessionTokenOf(request, config);
+    const session = token === undefined ? undefined : await service.getSession(token);
+    if (session !== undefined && !session.ok) throw session.error;
+    if (session === undefined || session.value === null) {
+      return reply.status(401).send({ error: { code: "UNAUTHORIZED", message: "Sessão inexistente ou expirada." } });
+    }
+    const count = await service.countOnline();
+    if (!count.ok) throw count.error;
+    return { count: count.value };
   });
 
   app.post("/auth/logout", async (request, reply) => {

@@ -1,118 +1,54 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { createApiClient, normalizeApiBase, type SessionState } from "./api";
-import { cspViolations, diagnose } from "./diagnostics";
-
-type ViewState = { readonly kind: "loading" } | SessionState;
-
-function readLoginError(): boolean {
-  const params = new URLSearchParams(window.location.search);
-  const failed = params.get("auth") === "error";
-  if (params.has("auth")) {
-    // Remove o parâmetro para que um refresh não repita a mensagem.
-    window.history.replaceState(null, "", window.location.pathname);
-  }
-  return failed;
-}
+// ============================================================
+// NEXORA FOREX — App Root
+//
+// Providers globais (Auth, Loader, Trading) ficam aqui.
+// BotsProvider NÃO está aqui para as rotas gerais: cada página que precisa
+// dele (Dashboard, OperarManual) monta o seu próprio <BotsProvider/>, para
+// só carregar o catálogo de bots depois de existir sessão.
+//
+// Entrada: "/" (LoginPage) oferece "Entrar com a Deriv" e "Criar conta na
+// Deriv" (OAuth no servidor). O servidor termina o login em "/callback".
+// Rotas de funcionalidades sem servidor (admin, operar manual) mostram um
+// ecrã de "indisponível" enquanto a flag correspondente (lib/config) estiver desligada.
+// ============================================================
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
+import { TradingProvider } from './context/TradingContext'
+import { LoaderProvider } from './context/LoaderContext'
+import LoginPage from './pages/LoginPage'
+import ConnectDerivPage from './pages/ConnectDerivPage'
+import CallbackPage from './pages/CallbackPage'
+import DashboardPage from './pages/DashboardPage'
+import MenuPage from './pages/MenuPage'
+import AdminPage from './pages/AdminPage'
+import VideoLessonsPage from './pages/VideoLessonsPage'
+import OperarManualPage from './pages/OperarManualPage'
+import FeatureUnavailablePage from './pages/FeatureUnavailablePage'
+import { FEATURES } from './lib/config'
 
 export default function App() {
-  const base = normalizeApiBase(import.meta.env.VITE_API_BASE_URL);
-  const client = useMemo(() => (base === undefined ? undefined : createApiClient(base)), [base]);
-  const [state, setState] = useState<ViewState>({ kind: "loading" });
-  const [loginFailed] = useState(readLoginError);
-  const [busy, setBusy] = useState(false);
-  const [details, setDetails] = useState<string[] | undefined>(undefined);
-
-  const showDetails = async () => {
-    if (base === undefined) return;
-    setDetails(["A testar…"]);
-    setDetails(
-      await diagnose({
-        base,
-        pageOrigin: window.location.origin,
-        buildTime: __BUILD_TIME__,
-        fetchFn: (...args) => fetch(...args),
-        violations: cspViolations,
-      }),
-    );
-  };
-
-  const load = useCallback(async () => {
-    if (client === undefined) return;
-    setState({ kind: "loading" });
-    setState(await client.fetchSession());
-  }, [client]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const onLogout = async () => {
-    if (client === undefined) return;
-    setBusy(true);
-    const done = await client.logout();
-    setBusy(false);
-    if (done) setState({ kind: "anonymous" });
-    else setState({ kind: "error", message: "Não foi possível terminar a sessão. Tenta novamente." });
-  };
-
   return (
-    <main className="shell">
-      <header>
-        <h1>NEXORA TRADING</h1>
-        <p className="tagline">Plataforma de trading em tempo real sobre a API oficial da Deriv.</p>
-      </header>
-
-      {client === undefined && (
-        <p role="alert" className="notice error">
-          Configuração em falta: define VITE_API_BASE_URL com o endereço https da API.
-        </p>
-      )}
-
-      {loginFailed && state.kind !== "authenticated" && (
-        <p role="alert" className="notice error">
-          Não foi possível concluir o login. Tenta novamente.
-        </p>
-      )}
-
-      {client !== undefined && state.kind === "loading" && <p aria-live="polite">A verificar sessão…</p>}
-
-      {client !== undefined && state.kind === "error" && (
-        <section>
-          <p role="alert" className="notice error">{state.message}</p>
-          <button type="button" onClick={() => void load()}>Tentar novamente</button>
-          <button type="button" className="secondary" onClick={() => void showDetails()}>Ver detalhes técnicos</button>
-          {details !== undefined && <pre className="details">{details.join("\n")}</pre>}
-        </section>
-      )}
-
-      {client !== undefined && state.kind === "anonymous" && (
-        <section>
-          <p>Para começar, liga a tua conta Deriv. Nunca vemos a tua palavra-passe.</p>
-          <a className="button" href={client.loginUrl}>Entrar com a Deriv</a>
-        </section>
-      )}
-
-      {client !== undefined && state.kind === "authenticated" && (
-        <section>
-          <h2>As tuas contas</h2>
-          {state.user.accounts.length === 0 ? (
-            <p>Sem contas disponíveis.</p>
-          ) : (
-            <ul className="accounts">
-              {state.user.accounts.map((account) => (
-                <li key={account.accountId}>
-                  <strong>{account.accountId}</strong>
-                  <span className={`badge ${account.accountType}`}>{account.accountType === "demo" ? "Demo" : "Real"}</span>
-                  <span>{account.currency}</span>
-                  {account.status === "inactive" && <span className="badge inactive">Inativa</span>}
-                </li>
-              ))}
-            </ul>
-          )}
-          <button type="button" onClick={() => void onLogout()} disabled={busy}>Terminar sessão</button>
-        </section>
-      )}
-      <footer className="version">Versão {__BUILD_TIME__}</footer>
-    </main>
-  );
+    <BrowserRouter>
+      <AuthProvider>
+        <LoaderProvider>
+          <TradingProvider>
+            <Routes>
+              <Route path="/" element={<LoginPage />} />
+              <Route path="/register" element={<Navigate to="/" replace />} />
+              <Route path="/connect-deriv" element={<ConnectDerivPage />} />
+              <Route path="/callback" element={<CallbackPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/menu" element={<MenuPage />} />
+              <Route path="/admin" element={FEATURES.admin ? <AdminPage /> : <FeatureUnavailablePage title="Painel de administração" />} />
+              <Route path="/aprender-a-operar" element={<VideoLessonsPage />} />
+              {/* OperarManualPage já monta o seu próprio <BotsProvider/>
+                  internamente — NÃO envolver aqui outra vez. */}
+              <Route path="/operar-manual" element={FEATURES.manualTrading ? <OperarManualPage /> : <FeatureUnavailablePage title="Operar manualmente" />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </TradingProvider>
+        </LoaderProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  )
 }

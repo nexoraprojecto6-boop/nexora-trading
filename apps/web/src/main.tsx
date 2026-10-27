@@ -1,16 +1,15 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import App from "./App";
-import { recordCspViolations } from "./diagnostics";
-import "./styles.css";
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import '@fontsource-variable/space-grotesk'
+import '@fontsource-variable/geist'
+import '@fontsource-variable/geist-mono'
+import './styles/index.css'
+import App from './App'
 
-recordCspViolations(document);
-
-const container = document.getElementById("root");
-if (container === null) throw new Error("Elemento #root não encontrado.");
-
-createRoot(container).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+createRoot(document.getElementById('root')!).render(
+  // StrictMode desactivado em produção para evitar double-mount
+  // dos WebSockets (causava sessões duplicadas no backend).
+  // Em desenvolvimento, usar <StrictMode> só se precisares de
+  // detectar efeitos colaterais — sabendo que os WS vão ligar 2x.
+  <App />
+)

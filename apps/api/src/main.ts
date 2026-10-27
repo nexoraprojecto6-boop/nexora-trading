@@ -2,6 +2,7 @@ import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { createDerivAuthClient } from "@nexora/deriv-client";
 import { createAuthService } from "./auth/service.js";
+import { createBotService } from "./bots/service.js";
 import { createDatabase } from "./db/pool.js";
 
 const configResult = loadConfig(process.env);
@@ -23,6 +24,7 @@ const auth =
 const app = await buildApp(config, {
   ...(database !== undefined ? { database } : {}),
   ...(auth !== undefined ? { auth } : {}),
+  ...(database !== undefined ? { bots: createBotService(database.pool) } : {}),
 });
 if (config.nodeEnv === "production" && config.database?.ssl === "disable") {
   app.log.warn("A ligação à base de dados em produção não usa TLS (DATABASE_SSL=disable).");

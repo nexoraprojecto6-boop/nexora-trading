@@ -25,7 +25,7 @@ const key = parseEncryptionKey(KEY).value;
 const admin = new pg.Client({ connectionString: URL_ }); await admin.connect();
 await admin.query("drop schema public cascade; create schema public;");
 const mig = await runMigrations({ connectionString: URL_, ssl: "disable" }, MIG_DIR);
-assert.ok(mig.ok, mig.error?.message); assert.deepEqual(mig.value.applied, ["0001_funcao_updated_at", "0002_autenticacao"]);
+assert.ok(mig.ok, mig.error?.message); assert.deepEqual(mig.value.applied, ["0001_funcao_updated_at", "0002_autenticacao", "0003_bots_do_utilizador"]);
 
 const pool = new pg.Pool({ connectionString: URL_ });
 // Deriv simulada: só aceita o código se o verifier corresponder ao challenge enviado no login.
@@ -65,7 +65,7 @@ const cb = (qs, nonce) => app.inject({ url: "/auth/callback?" + new URLSearchPar
 // fluxo feliz
 let a = await login();
 let r = await cb({ code: "good-code", state: a.state }, a.nonce);
-assert.equal(r.statusCode, 302); assert.equal(r.headers.location, WEB + "/");
+assert.equal(r.statusCode, 302); assert.equal(r.headers.location, WEB + "/callback");
 const sess = cookieVal(r, SESSION); assert.equal(sess.length, 43);
 const sc = setCookies(r).find((x) => x.startsWith(SESSION + "=")); assert.match(sc, /HttpOnly/); assert.match(sc, /Secure/); assert.match(sc, /SameSite=Lax/);
 assert.match(setCookies(r).find((x) => x.startsWith(OAUTH + "=")), /Max-Age=0/);
@@ -83,23 +83,25 @@ const sRows = (await admin.query("select token_hash from sessions")).rows; asser
 assert.equal((await admin.query("select count(*)::int n from oauth_login_attempts")).rows[0].n, 0);
 
 // replay do mesmo state
-r = await cb({ code: "good-code", state: a.state }, a.nonce); assert.equal(r.headers.location, WEB + "/?auth=error"); assert.equal(cookieVal(r, SESSION), undefined);
+r = await cb({ code: "good-code", state: a.state }, a.nonce); assert.equal(r.headers.location, WEB + "/callback?error=login_failed"); assert.equal(cookieVal(r, SESSION), undefined);
 // sem cookie / cookie de outro browser / state desconhecido
 a = await login();
 for (const [nonce, st] of [[undefined, a.state], [randomToken(), a.state], [a.nonce, randomToken()]]) {
-  r = await cb({ code: "good-code", state: st }, nonce); assert.equal(r.headers.location, WEB + "/?auth=error"); assert.equal(cookieVal(r, SESSION), undefined);
+  r = await cb({ code: "good-code", state: st }, nonce); assert.equal(r.headers.location, WEB + "/callback?error=login_failed"); assert.equal(cookieVal(r, SESSION), undefined);
 }
 const before = exchanged;
 // a tentativa foi consumida pelo teste do cookie errado → já não serve
-r = await cb({ code: "good-code", state: a.state }, a.nonce); assert.equal(r.headers.location, WEB + "/?auth=error"); assert.equal(exchanged, before);
+r = await cb({ code: "good-code", state: a.state }, a.nonce); assert.equal(r.headers.location, WEB + "/callback?error=login_failed"); assert.equal(exchanged, before);
 // erro vindo da Deriv
 a = await login(); r = await cb({ error: "access_denied", error_description: "SEGREDO-NA-URL", state: a.state }, a.nonce);
-assert.equal(r.headers.location, WEB + "/?auth=error"); assert.ok(!JSON.stringify(r.headers).includes("SEGREDO"));
+assert.equal(r.headers.location, WEB + "/callback?error=access_denied"); assert.ok(!JSON.stringify(r.headers).includes("SEGREDO"));
+a = await login(); r = await cb({ error: "server_error SEGREDO-NA-URL", state: a.state }, a.nonce);
+assert.equal(r.headers.location, WEB + "/callback?error=login_failed"); assert.ok(!JSON.stringify(r.headers).includes("SEGREDO"));
 // código recusado pela Deriv
-a = await login(); r = await cb({ code: "mau", state: a.state }, a.nonce); assert.equal(r.headers.location, WEB + "/?auth=error"); assert.equal(cookieVal(r, SESSION), undefined);
+a = await login(); r = await cb({ code: "mau", state: a.state }, a.nonce); assert.equal(r.headers.location, WEB + "/callback?error=login_failed"); assert.equal(cookieVal(r, SESSION), undefined);
 // tentativa expirada
 a = await login(); await admin.query("update oauth_login_attempts set expires_at = now() - interval '1 second'");
-const b2 = exchanged; r = await cb({ code: "good-code", state: a.state }, a.nonce); assert.equal(r.headers.location, WEB + "/?auth=error"); assert.equal(exchanged, b2);
+const b2 = exchanged; r = await cb({ code: "good-code", state: a.state }, a.nonce); assert.equal(r.headers.location, WEB + "/callback?error=login_failed"); assert.equal(exchanged, b2);
 // parâmetros demasiado longos
 r = await app.inject({ url: "/auth/callback?code=" + "a".repeat(3000) + "&state=x" }); assert.equal(r.statusCode, 400);
 
@@ -118,7 +120,7 @@ accountsToReturn = [{ accountId: "OUTRA", accountType: "real", currency: "USD", 
 a = await login(); r = await cb({ code: "good-code", state: a.state }, a.nonce);
 assert.equal((await admin.query("select user_id from deriv_accounts where account_id='CR1'")).rows[0].user_id, userId, "CR1 não pode mudar de dono");
 // conta sem contas de trading
-accountsToReturn = []; a = await login(); r = await cb({ code: "good-code", state: a.state }, a.nonce); assert.equal(r.headers.location, WEB + "/?auth=error");
+accountsToReturn = []; a = await login(); r = await cb({ code: "good-code", state: a.state }, a.nonce); assert.equal(r.headers.location, WEB + "/callback?error=login_failed");
 accountsToReturn = [{ accountId: "CR1", accountType: "real", currency: "USD", status: "active" }];
 
 // /me sem sessão, lixo, expirada

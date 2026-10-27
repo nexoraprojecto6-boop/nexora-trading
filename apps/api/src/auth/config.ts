@@ -9,6 +9,8 @@ export interface AuthConfig {
   /** Origem do frontend (sem barra final). Único destino de redirecionamentos pós-login. */
   readonly webOrigin: string;
   readonly encryptionKey: Buffer;
+  /** Token de afiliado da Deriv (opcional). Atribui os registos feitos por "Criar conta". */
+  readonly affiliateToken?: string;
   readonly sessionTtlSeconds: number;
   readonly loginAttemptTtlSeconds: number;
   /** Cookies com atributo Secure e prefixo __Host-. */
@@ -79,11 +81,17 @@ export function loadAuthConfig(env: Env, nodeEnv: NodeEnv): Result<AuthConfig | 
   const key = parseEncryptionKey(values.get("APP_ENCRYPTION_KEY") ?? "");
   if (!key.ok) return key;
 
+  const affiliate = env["DERIV_AFFILIATE_TOKEN"]?.trim();
+  if (affiliate !== undefined && affiliate !== "" && !/^[A-Za-z0-9_-]{8,64}$/.test(affiliate)) {
+    return err(new AppError("CONFIG", "DERIV_AFFILIATE_TOKEN inválido: só letras, números, '_' e '-' (8 a 64)."));
+  }
+
   return ok({
     appId,
     redirectUri: redirect.value.toString(),
     webOrigin: web.value.origin,
     encryptionKey: key.value,
+    ...(affiliate !== undefined && affiliate !== "" ? { affiliateToken: affiliate } : {}),
     sessionTtlSeconds: 8 * 60 * 60,
     loginAttemptTtlSeconds: 10 * 60,
     cookieSecure: nodeEnv === "production",

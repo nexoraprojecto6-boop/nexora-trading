@@ -4,6 +4,12 @@ import { AppError, err, ok, type Result } from "@nexora/shared";
 import type { AuthConfig } from "./config.js";
 import { createPkce, decryptSecret, encryptSecret, randomToken, safeEqualHex, sha256Hex } from "./crypto.js";
 
+export interface AccountsView {
+  readonly accounts: readonly DerivAccount[];
+  /** `true` quando os saldos vieram agora da Deriv; `false` se o token expirou ou a Deriv falhou. */
+  readonly live: boolean;
+}
+
 export interface SessionUser {
   readonly userId: string;
   readonly accounts: readonly DerivAccount[];
@@ -11,12 +17,16 @@ export interface SessionUser {
 
 export interface AuthService {
   /** Prepara o login: devolve o URL da Deriv e o nonce a guardar no cookie do browser. */
-  startLogin(): Promise<Result<{ redirectUrl: string; browserNonce: string }>>;
+  startLogin(options?: { registration?: boolean }): Promise<Result<{ redirectUrl: string; browserNonce: string }>>;
   /** Conclui o login. Os erros para o utilizador são sempre genéricos. */
   completeLogin(input: { code: string; state: string; browserNonce: string }): Promise<Result<{ sessionToken: string }>>;
   /** `ok(null)` quando o token não existe ou expirou. */
   getSession(token: string): Promise<Result<SessionUser | null>>;
   logout(token: string): Promise<Result<void>>;
+  /** Contas com saldo atual (via Deriv). Sem token válido, devolve as contas guardadas, sem saldo. */
+  getAccountsView(userId: string): Promise<Result<AccountsView>>;
+  /** Número de sessões ativas nos últimos 5 minutos. */
+  countOnline(): Promise<Result<number>>;
 }
 
 export interface AuthServiceDeps {
@@ -61,7 +71,7 @@ export function createAuthService({ pool, deriv, config }: AuthServiceDeps): Aut
   }
 
   return {
-    async startLogin() {
+    async startLogin(options = {}) {
       try {
         // Limpeza oportunista de tentativas expiradas.
         await pool.query("delete from oauth_login_attempts where expires_at < now()");
@@ -79,6 +89,14 @@ export function createAuthService({ pool, deriv, config }: AuthServiceDeps): Aut
           scopes: ["trade"],
           state,
           codeChallenge: pkce.challenge,
+          ...(options.registration === true
+            ? {
+                prompt: "registration" as const,
+                ...(config.affiliateToken !== undefined
+                  ? { affiliate: { token: config.affiliateToken, campaign: "NEXORA" } }
+                  : {}),
+              }
+            : {}),
         });
         return ok({ redirectUrl, browserNonce });
       } catch (cause) {
@@ -214,6 +232,40 @@ export function createAuthService({ pool, deriv, config }: AuthServiceDeps): Aut
           if (userId !== undefined) await client.query("delete from deriv_credentials where user_id = $1", [userId]);
         });
         return ok(undefined);
+      } catch (cause) {
+        return err(new AppError("INTERNAL", DB_FAILED, { cause }));
+      }
+    },
+
+    async getAccountsView(userId) {
+      try {
+        const stored = await loadAccounts(userId);
+        const row = await pool.query<{ access_token_enc: string; valid: boolean }>(
+          "select access_token_enc, (access_expires_at is null or access_expires_at > now()) as valid from deriv_credentials where user_id = $1",
+          [userId],
+        );
+        const credentials = row.rows[0];
+        if (credentials === undefined || !credentials.valid) return ok({ accounts: stored, live: false });
+
+        const token = decryptSecret(key, credentials.access_token_enc, `deriv_token:${userId}`);
+        if (!token.ok) return ok({ accounts: stored, live: false });
+        const live = await deriv.listAccounts(token.value);
+        // Token recusado ou Deriv indisponível: não é um erro da nossa API, mostra o que está guardado.
+        if (!live.ok) return ok({ accounts: stored, live: false });
+        // Só devolve contas que pertencem a este utilizador (nunca contas de outro).
+        const owned = new Set(stored.map((account) => account.accountId));
+        return ok({ accounts: live.value.filter((account) => owned.has(account.accountId)), live: true });
+      } catch (cause) {
+        return err(new AppError("INTERNAL", DB_FAILED, { cause }));
+      }
+    },
+
+    async countOnline() {
+      try {
+        const result = await pool.query<{ count: number }>(
+          "select count(*)::int as count from sessions where expires_at > now() and last_seen_at > now() - interval '5 minutes'",
+        );
+        return ok(result.rows[0]?.count ?? 0);
       } catch (cause) {
         return err(new AppError("INTERNAL", DB_FAILED, { cause }));
       }
