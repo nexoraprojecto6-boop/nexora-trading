@@ -17,9 +17,6 @@ importers:
       '@fastify/cors':
         specifier: ^11.0.0
         version: 11.3.1
-      '@nexora/bot-engine':
-        specifier: workspace:*
-        version: link:../../packages/bot-engine
       '@nexora/deriv-client':
         specifier: workspace:*
         version: link:../../packages/deriv-client
