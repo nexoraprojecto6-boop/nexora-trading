@@ -6,10 +6,10 @@ import { decimalToMinorUnits, normalizeDecimal } from "./money.js";
  * (nunca número), para evitar erros de vírgula flutuante.
  */
 export type ParamDef =
-  | { readonly kind: "integer"; readonly key: string; readonly label: string; readonly help?: string; readonly min: number; readonly max: number; readonly default?: number }
-  | { readonly kind: "decimal"; readonly key: string; readonly label: string; readonly help?: string; readonly min: string; readonly max: string; readonly default?: string }
-  | { readonly kind: "select"; readonly key: string; readonly label: string; readonly help?: string; readonly options: readonly { readonly value: string; readonly label: string }[]; readonly default?: string }
-  | { readonly kind: "symbol"; readonly key: string; readonly label: string; readonly help?: string; readonly default?: string };
+  | { readonly kind: "integer"; readonly key: string; readonly label: string; readonly help?: string; readonly placeholder?: string; readonly min: number; readonly max: number; readonly default?: number }
+  | { readonly kind: "decimal"; readonly key: string; readonly label: string; readonly help?: string; readonly placeholder?: string; readonly min: string; readonly max: string; readonly default?: string }
+  | { readonly kind: "select"; readonly key: string; readonly label: string; readonly help?: string; readonly placeholder?: string; readonly options: readonly { readonly value: string; readonly label: string }[]; readonly default?: string }
+  | { readonly kind: "symbol"; readonly key: string; readonly label: string; readonly help?: string; readonly placeholder?: string; readonly default?: string };
 
 export type ParamValues = Readonly<Record<string, string | number>>;
 
@@ -22,6 +22,8 @@ export interface BotDefinition {
   /** Texto completo, mostrado em "Descrição". */
   readonly description: string;
   readonly params: readonly ParamDef[];
+  /** Limites de risco próprios do bot. Sem isto, usa RISK_PARAMS. */
+  readonly riskParams?: readonly ParamDef[];
 }
 
 /**
@@ -42,7 +44,14 @@ export const RISK_PARAMS: readonly ParamDef[] = [
  * Nenhum bot deste catálogo promete lucro.
  */
 const DIGIT_PARAMS: readonly ParamDef[] = [
-  { kind: "symbol", key: "symbol", label: "Símbolo", help: "Mercado sintético (ex.: R_100).", default: "R_100" },
+  { kind: "symbol", key: "symbol", label: "Mercado", default: "R_100" },
+];
+
+/** Os 3 campos que importam nos bots de dígitos. Sem valor por omissão: o utilizador preenche. */
+const DIGIT_RISK: readonly ParamDef[] = [
+  { kind: "decimal", key: "stake", label: "Stake inicial", min: "0.35", max: "100000", placeholder: "Ex.: 1.00 (valor de cada operação)" },
+  { kind: "decimal", key: "takeProfit", label: "Take profit", min: "0.01", max: "1000000", placeholder: "Ex.: 10.00 (pára ao ganhar este valor)" },
+  { kind: "decimal", key: "stopLoss", label: "Stop loss", min: "0.01", max: "1000000", placeholder: "Ex.: 20.00 (pára ao perder este valor)" },
 ];
 
 export const BOT_CATALOG: readonly BotDefinition[] = [
@@ -77,6 +86,7 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
       "Compra DIGITDIFF com barreira 3. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
+    riskParams: DIGIT_RISK,
   },
   {
     id: "digit-1",
@@ -86,6 +96,7 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
       "Compra DIGITDIFF com barreira 1. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
+    riskParams: DIGIT_RISK,
   },
   {
     id: "over-5",
@@ -95,6 +106,7 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
       "Compra DIGITOVER com barreira 5. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
+    riskParams: DIGIT_RISK,
   },
   {
     id: "under-8",
@@ -104,6 +116,7 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
       "Compra DIGITUNDER com barreira 8. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
+    riskParams: DIGIT_RISK,
   },
   {
     id: "even",
@@ -113,6 +126,7 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
       "Compra DIGITEVEN. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
+    riskParams: DIGIT_RISK,
   },
   {
     id: "odd",
@@ -122,6 +136,7 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
       "Compra DIGITODD. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
+    riskParams: DIGIT_RISK,
   },
 ];
 
@@ -203,15 +218,16 @@ export function validateBotConfig(bot: BotDefinition, input: unknown): Result<Bo
     return err(new AppError("VALIDATION", "Configuração inválida.", { details: { errors: { "*": "Configuração em falta." } } }));
   }
   const params = validateParams(bot.params, input["params"] ?? {}, "params.");
-  const risk = validateParams(RISK_PARAMS, input["risk"], "risk.");
+  const risk = validateParams(bot.riskParams ?? RISK_PARAMS, input["risk"], "risk.");
   const errors: Record<string, string> = {
     ...(!params.ok ? ((params.error.details?.["errors"] as Record<string, string> | undefined) ?? {}) : {}),
     ...(!risk.ok ? ((risk.error.details?.["errors"] as Record<string, string> | undefined) ?? {}) : {}),
   };
   if (params.ok && risk.ok) {
     const stake = toMinor8(String(risk.value["stake"]));
-    const maxDailyLoss = toMinor8(String(risk.value["maxDailyLoss"]));
-    if (maxDailyLoss < stake) errors["risk.maxDailyLoss"] = "Tem de ser igual ou superior ao valor por operação.";
+    const capKey = risk.value["maxDailyLoss"] !== undefined ? "maxDailyLoss" : "stopLoss";
+    const cap = risk.value[capKey];
+    if (cap !== undefined && toMinor8(String(cap)) < stake) errors[`risk.${capKey}`] = "Tem de ser igual ou superior ao valor por operação.";
   }
   if (Object.keys(errors).length > 0) {
     return err(new AppError("VALIDATION", "Configuração inválida.", { details: { errors } }));

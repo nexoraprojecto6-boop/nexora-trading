@@ -183,11 +183,11 @@ export function registerBotRoutes(app: FastifyInstance, deps: BotRouteDeps): voi
         overrides: {
           symbol: String(config.params["symbol"] ?? "R_100"),
           stake: Number(risk["stake"]),
-          stopLoss: Number(risk["maxDailyLoss"]),
-          takeProfit: 0,
-          maxConsecutiveLosses: Number(risk["maxConsecutiveLosses"]),
-          maxTrades: Number(risk["maxTradesPerDay"]),
-          cooldownMs: Number(risk["cooldownSeconds"]) * 1000,
+          takeProfit: Number(risk["takeProfit"]),
+          stopLoss: Number(risk["stopLoss"]),
+          maxConsecutiveLosses: 0,
+          maxTrades: 0,
+          cooldownMs: 0,
           stakeMultiplierOnLoss: 1,
         },
       });
@@ -195,6 +195,14 @@ export function registerBotRoutes(app: FastifyInstance, deps: BotRouteDeps): voi
       return reply.status(204).send();
     },
   );
+
+  app.post("/me/bots/clear-history", async (request, reply) => {
+    if (!(await requireWebOrigin(request, reply))) return reply;
+    const ctx = await requireRunner(request, reply);
+    if (ctx === undefined) return reply;
+    ctx.runner.clearHistory(ctx.user.userId);
+    return reply.status(204).send();
+  });
 
   app.post<{ Params: { id: string } }>("/me/bots/:id/stop", { schema: { params: botIdParams } }, async (request, reply) => {
     if (!(await requireWebOrigin(request, reply))) return reply;

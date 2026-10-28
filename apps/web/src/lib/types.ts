@@ -174,6 +174,8 @@ export interface StrategyFieldDef {
   step?: number
   options?: { value: string; label: string }[]
   description?: string
+  /** Texto-guia dentro do campo vazio. */
+  placeholder?: string
   group?: string
 }
 

@@ -133,6 +133,7 @@ export interface ApiParamDef {
   max?: number | string
   options?: { value: string; label: string }[]
   default?: string | number
+  placeholder?: string
 }
 
 export interface ApiBotDefinition {
@@ -141,6 +142,8 @@ export interface ApiBotDefinition {
   summary: string
   description: string
   params: ApiParamDef[]
+  /** Limites próprios do bot; sem isto, valem os gerais. */
+  riskParams?: ApiParamDef[]
 }
 
 export interface BotSettingsValues {
@@ -166,6 +169,7 @@ export interface LiveBotStats {
   profit: number
   consecutiveLosses: number
   currentStake: number
+  open?: { contractId: number; stake: number; at: number }
 }
 
 export interface LiveTrade {
@@ -186,6 +190,7 @@ export interface LiveBots {
   accountId: string | null
   bots: LiveBotStats[]
   trades: LiveTrade[]
+  totals: Record<string, { trades: number; wins: number; losses: number; profit: number; gain: number; loss: number }>
 }
 
 // ── Núcleo ──────────────────────────────────────────────────

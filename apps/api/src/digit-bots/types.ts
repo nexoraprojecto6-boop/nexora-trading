@@ -76,6 +76,8 @@ export interface BotStats {
   currentStake: number;
   lastLatencyMs: number | null;
   avgLatencyMs: number | null;
+  /** Contrato de 1 tick aberto neste momento (alimenta a barra de progresso). */
+  open?: { contractId: number; stake: number; at: number };
 }
 
 /** Subconjunto de `proposal_open_contract` usado pelos bots. */

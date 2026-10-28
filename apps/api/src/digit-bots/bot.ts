@@ -44,6 +44,7 @@ export class DigitBot {
   private consecutiveErrors = 0;
   private stake: number;
   private latencies: number[] = [];
+  private open: { contractId: number; stake: number; at: number } | null = null;
 
   private readonly now: () => number;
   private readonly sleep: (ms: number) => Promise<void>;
@@ -99,6 +100,7 @@ export class DigitBot {
       currentStake: this.stake,
       lastLatencyMs: n ? this.latencies[n - 1]! : null,
       avgLatencyMs: n ? Math.round(this.latencies.reduce((a, b) => a + b, 0) / n) : null,
+      ...(this.open ? { open: this.open } : {}),
     };
   }
 
@@ -172,16 +174,19 @@ export class DigitBot {
       return;
     }
     const latency = this.now() - t0;
+    this.open = { contractId: receipt.contract_id, stake, at: this.now() };
 
     let poc: OpenContract;
     try {
       poc = await this.waitSettlement(receipt.contract_id);
     } catch (e) {
+      this.open = null;
       // Estado incerto: não repetimos a compra às cegas.
       this.finish('error', e);
       return;
     }
 
+    this.open = null;
     const status = String(poc.status ?? '');
     let profit = num(poc.profit);
     if (Number.isNaN(profit)) profit = num(poc.sell_price) - num(poc.buy_price);

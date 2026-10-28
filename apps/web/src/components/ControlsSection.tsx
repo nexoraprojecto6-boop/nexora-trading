@@ -52,6 +52,8 @@ function NumberField({ f, value, onChange }: { f: StrategyFieldDef; value: unkno
     <input
       type="number"
       value={raw}
+      placeholder={f.placeholder}
+      inputMode="decimal"
       min={f.min}
       max={f.max}
       step={f.step ?? 1}

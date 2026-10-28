@@ -6,10 +6,21 @@ export interface RunnerAccount {
   readonly accountType: "demo" | "real";
 }
 
+export interface Totals {
+  trades: number;
+  wins: number;
+  losses: number;
+  profit: number;
+  gain: number;
+  loss: number;
+}
+
 export interface LiveState {
   readonly accountId: string | null;
   readonly bots: BotStats[];
   readonly trades: TradeRecord[];
+  /** Resultados desde o último "limpar histórico", por bot. */
+  readonly totals: Record<string, Totals>;
 }
 
 export interface BotRunner {
@@ -20,6 +31,8 @@ export interface BotRunner {
   start(input: { userId: string; token: string; account: RunnerAccount; botId: string; overrides: Partial<BotConfig> }): Promise<Result<void>>;
   stop(userId: string, botId: string): Promise<void>;
   state(userId: string): LiveState;
+  /** Apaga o histórico e os totais (ganhos/perdas). Não altera os limites de risco de bots a correr. */
+  clearHistory(userId: string): void;
   close(): Promise<void>;
 }
 
@@ -35,6 +48,7 @@ interface Entry {
   readonly accountId: string;
   readonly token: string;
   readonly trades: TradeRecord[];
+  totals: Record<string, Totals>;
   lastUsed: number;
 }
 
@@ -75,10 +89,16 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
     if (entry === undefined) {
       const session = new DerivSession({ token, accountId: account.accountId, accountType: account.accountType, log });
       const manager = new BotManager({ session, log });
-      const created: Entry = { session, manager, accountId: account.accountId, token, trades: [], lastUsed: Date.now() };
+      const created: Entry = { session, manager, accountId: account.accountId, token, trades: [], totals: {}, lastUsed: Date.now() };
       manager.on("trade", (trade: TradeRecord) => {
         created.trades.unshift(trade);
         if (created.trades.length > 200) created.trades.length = 200;
+        const t = (created.totals[trade.botId] ??= { trades: 0, wins: 0, losses: 0, profit: 0, gain: 0, loss: 0 });
+        t.trades += 1;
+        if (trade.won) t.wins += 1; else t.losses += 1;
+        t.profit = Math.round((t.profit + trade.profit) * 100) / 100;
+        if (trade.profit > 0) t.gain = Math.round((t.gain + trade.profit) * 100) / 100;
+        if (trade.profit < 0) t.loss = Math.round((t.loss - trade.profit) * 100) / 100;
       });
       entries.set(userId, created);
       entry = created;
@@ -125,9 +145,16 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
 
     state(userId) {
       const entry = entries.get(userId);
-      if (entry === undefined) return { accountId: null, bots: [], trades: [] };
+      if (entry === undefined) return { accountId: null, bots: [], trades: [], totals: {} };
       entry.lastUsed = Date.now();
-      return { accountId: entry.accountId, bots: entry.manager.status(), trades: entry.trades };
+      return { accountId: entry.accountId, bots: entry.manager.status(), trades: entry.trades, totals: entry.totals };
+    },
+
+    clearHistory(userId) {
+      const entry = entries.get(userId);
+      if (entry === undefined) return;
+      entry.trades.length = 0;
+      entry.totals = {};
     },
 
     async close() {

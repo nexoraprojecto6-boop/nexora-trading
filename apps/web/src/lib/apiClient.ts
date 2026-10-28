@@ -87,6 +87,9 @@ export function createApi(base: string | undefined, fetchFn: typeof fetch = (...
     async stopBotRun(botId: string): Promise<void> {
       await request(`/me/bots/${encodeURIComponent(botId)}/stop`, { method: 'POST' })
     },
+    async clearBotHistory(): Promise<void> {
+      await request('/me/bots/clear-history', { method: 'POST' })
+    },
     async getBotsLive(): Promise<LiveBots> {
       return request('/me/bots/live')
     },

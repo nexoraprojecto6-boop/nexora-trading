@@ -12,7 +12,7 @@ export const GROUP_BOT = 'Parâmetros do bot'
 export const GROUP_RISK = 'Limites de risco'
 
 export function toField(def: ApiParamDef, group: string): StrategyFieldDef {
-  const base = { key: def.key, label: def.label, group, ...(def.help ? { description: def.help } : {}) }
+  const base = { key: def.key, label: def.label, group, ...(def.help ? { description: def.help } : {}), ...(def.placeholder ? { placeholder: def.placeholder } : {}) }
   const dflt = def.default !== undefined ? { defaultValue: def.default } : {}
   switch (def.kind) {
     case 'integer':
@@ -42,7 +42,7 @@ export function toCatalogBot(def: ApiBotDefinition, riskParams: ApiParamDef[]): 
     strategy: def.id as BotStrategyType,
     defaultConfig: {},
     paramFields: def.params.map(p => toField(p, GROUP_BOT)),
-    riskFields: riskParams.map(p => toField(p, GROUP_RISK)),
+    riskFields: (def.riskParams ?? riskParams).map(p => toField(p, GROUP_RISK)),
     tags: [],
     isActive: true,
     createdAt: now,

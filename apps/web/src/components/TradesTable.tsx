@@ -75,7 +75,7 @@ export function TradesTable() {
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-          <button onClick={() => { if (confirm('Limpar histórico de trades?')) clearTrades() }} title="Limpar" aria-label="Limpar" style={iconBtn}>
+          <button onClick={() => { if (confirm('Limpar o histórico de trades, ganhos e perdas?')) clearTrades() }} disabled={trades.length === 0} title="Limpar histórico" aria-label="Limpar histórico" style={{ ...iconBtn, opacity: trades.length === 0 ? 0.35 : 1, cursor: trades.length === 0 ? 'default' : 'pointer' }}>
             <IoTrashOutline size={19} />
           </button>
           <button title="Gráfico" aria-label="Gráfico" style={iconBtn}>

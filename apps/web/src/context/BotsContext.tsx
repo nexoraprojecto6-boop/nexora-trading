@@ -111,7 +111,7 @@ const ZERO_STATS = {
 }
 /** Bots que operam de verdade no servidor (os restantes só acompanham o mercado). */
 const RUNNABLE = new Set(['digit-3', 'digit-1', 'over-5', 'under-8', 'even', 'odd'])
-const LIVE_POLL_MS = 1000
+const LIVE_POLL_MS = 400
 const STOP_TEXT: Record<string, string> = {
   stop_loss: 'Atingiu a perda máxima definida.',
   take_profit: 'Atingiu o lucro definido.',
@@ -137,6 +137,9 @@ export function BotsProvider({ children }: { children: ReactNode }) {
   const [trades, setTrades] = useState<TradeRecord[]>([])
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevStatus = useRef<Record<string, string>>({})
+  /** Sobe ao limpar o histórico: respostas pedidas antes são ignoradas (não repõem o que foi apagado). */
+  const clearGen = useRef(0)
+  const [openTrades, setOpenTrades] = useState<Record<string, TradeRecord>>({})
 
   const notify = useCallback((msg: StatusMessage) => {
     setStatusMessage(msg)
@@ -268,10 +271,23 @@ export function BotsProvider({ children }: { children: ReactNode }) {
   // ── Estado em tempo real dos bots que operam (consulta a cada segundo enquanto algum corre) ──
   const applyLive = useCallback((live: LiveBots) => {
     const nameOf = (botId: string) => catalogBots.find(b => b.id === botId)?.name ?? botId
+    // O painel identifica o bot em execução como `local-<id>`.
+    const sid = (botId: string) => `local-${botId}`
+    const opens: Record<string, TradeRecord> = {}
+    for (const st of live.bots) {
+      if (st.status === 'running' && st.open) {
+        opens[String(st.open.contractId)] = {
+          id: String(st.open.contractId), hora: new Date(st.open.at).toLocaleTimeString('pt-PT', { hour12: false }),
+          botId: sid(st.botId), botName: nameOf(st.botId), strategy: st.botId, stake: st.open.stake, profit: 0, won: false,
+          timestamp: st.open.at, pending: true,
+        }
+      }
+    }
+    setOpenTrades(opens)
     setTrades(live.trades.map(t => ({
       id: String(t.contractId),
       hora: new Date(t.at).toLocaleTimeString('pt-PT', { hour12: false }),
-      botId: t.botId,
+      botId: sid(t.botId),
       botName: nameOf(t.botId),
       strategy: t.botId,
       stake: t.stake,
@@ -288,16 +304,14 @@ export function BotsProvider({ children }: { children: ReactNode }) {
       if (!st || !RUNNABLE.has(botId)) return b
       // Enquanto o servidor ainda não registou o arranque, mantém o estado local (evita piscar).
       if (st.status === 'idle') return b
-      const mine = live.trades.filter(t => t.botId === botId)
-      const totalProfit = mine.reduce((a, t) => a + (t.profit > 0 ? t.profit : 0), 0)
-      const totalLoss = mine.reduce((a, t) => a + (t.profit < 0 ? -t.profit : 0), 0)
+      const tot = live.totals[botId] ?? { trades: 0, wins: 0, losses: 0, profit: 0, gain: 0, loss: 0 }
       return {
         ...b,
         status: st.status === 'running' ? 'running' : 'stopped',
         stats: {
           ...b.stats,
-          totalTrades: st.trades, wins: st.wins, losses: st.losses, winRate: st.winRate * 100,
-          netPnL: st.profit, totalProfit, totalLoss, currentStake: st.currentStake, currentStreak: st.consecutiveLosses,
+          totalTrades: tot.trades, wins: tot.wins, losses: tot.losses, winRate: tot.trades ? (tot.wins / tot.trades) * 100 : 0,
+          netPnL: tot.profit, totalProfit: tot.gain, totalLoss: tot.loss, currentStake: st.currentStake, currentStreak: st.consecutiveLosses,
         },
       }
     }))
@@ -310,14 +324,32 @@ export function BotsProvider({ children }: { children: ReactNode }) {
     }
   }, [catalogBots, notify])
 
+  useEffect(() => {
+    if (!isAuthenticated || isLoadingCatalog || catalogBots.length === 0) return
+    let cancelled = false
+    void api.getBotsLive().then(live => {
+      if (cancelled) return
+      setSessionBots(prev => {
+        const add = live.bots
+          .filter(st => st.status === 'running' && RUNNABLE.has(st.botId) && !prev.some(b => b.id === `local-${st.botId}`))
+          .map((st): BotSummary => ({ id: `local-${st.botId}`, name: st.label, strategy: st.botId as BotSummary['strategy'], status: 'running', stats: { ...ZERO_STATS }, startedAt: new Date().toISOString() }))
+        return add.length ? [...prev, ...add] : prev
+      })
+      applyLive(live)
+    }).catch(() => undefined)
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, isLoadingCatalog])
+
   const anyRunning = sessionBots.some(b => b.status === 'running' && RUNNABLE.has(b.id.replace(/^local-/, '')))
   useEffect(() => {
     if (!isAuthenticated || !anyRunning) return
     let cancelled = false
     const tick = async () => {
       try {
+        const gen = clearGen.current
         const live = await api.getBotsLive()
-        if (!cancelled) applyLive(live)
+        if (!cancelled && gen === clearGen.current) applyLive(live)
       } catch { /* falha pontual: tenta no próximo segundo */ }
     }
     void tick()
@@ -333,13 +365,22 @@ export function BotsProvider({ children }: { children: ReactNode }) {
 
   const noop = useCallback(() => {}, [])
 
+  // Limpar histórico: apaga as operações e zera ganhos/perdas/saldo da sessão (também no servidor).
+  const clearTrades = useCallback(() => {
+    clearGen.current += 1
+    setTrades([])
+    setOpenTrades({})
+    setSessionBots(prev => prev.map(b => ({ ...b, stats: { ...ZERO_STATS } })))
+    void api.clearBotHistory().catch(() => notify({ kind: 'error', title: 'Não foi possível limpar', text: 'Tente novamente.' }))
+  }, [notify])
+
   return (
     <Ctx.Provider value={{
       catalogBots, isLoadingCatalog, sessionBots, botStates: {}, wsStatus, lastError, statusMessage,
-      trades, botTrades: {}, openTrades: {}, botLogs: {},
+      trades, botTrades: {}, openTrades, botLogs: {},
       listCatalogBots: () => { void load() }, listSessionBots: noop,
       startCatalogBot, stopBot, pauseBot, resumeBot, deleteBot,
-      getBotLogs: noop, clearTrades: () => setTrades([]),
+      getBotLogs: noop, clearTrades,
       adminAddCatalogBot: unavailable, adminRemoveCatalogBot: unavailable, adminUpdateCatalogBot: unavailable,
       manualBuy, manualPendingTrade: null, manualTrades: [], manualBuyError,
       selectedBotId, savedConfig, selectBot, saveBotConfig,
