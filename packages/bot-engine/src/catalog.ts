@@ -68,7 +68,7 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
   },
   {
     id: "over-3",
-    name: "Superior a 3 (Over 3)",
+    name: "Scalper (Superior a 3)",
     summary: "Aposta que o próximo dígito é maior que 3.",
     description:
       "ENTRADA: DIGITOVER com barreira 3 (ganha se o dígito final for 4 a 9). Sem análise: entra sempre neste contrato. " +
@@ -79,7 +79,7 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
   },
   {
     id: "over-1",
-    name: "Superior a 1 (Over 1)",
+    name: "Ethereum (Superior a 1)",
     summary: "Aposta que o próximo dígito é maior que 1.",
     description:
       "ENTRADA: DIGITOVER com barreira 1 (ganha se o dígito final for 2 a 9). Sem análise: entra sempre neste contrato. " +

@@ -106,6 +106,8 @@ export class DerivSession extends EventEmitter implements TradingSession {
     }
     const url = await fetchOtpUrl(this.opts, this.accountId);
     await this.openSocket(url);
+    // Saldo em tempo real: a Deriv envia cada alteração (desconto da compra e crédito do ganho).
+    void this.request({ balance: 1, subscribe: 1 }).catch(() => undefined);
     this.attempts = 0;
     this.startPing();
     this.log(`Ligado à conta ${this.accountType} ${this.accountId} (${this.currency})`);
@@ -243,6 +245,10 @@ export class DerivSession extends EventEmitter implements TradingSession {
       return;
     }
 
+    if (msg.msg_type === 'balance' && msg.balance && !msg.error) this.setBalance(msg.balance.balance);
+    // O recibo da compra já traz o saldo depois de descontar o stake (atualiza logo, sem esperar o stream).
+    if (msg.msg_type === 'buy' && msg.buy && !msg.error) this.setBalance(msg.buy.balance_after);
+
     if (msg.msg_type === 'proposal_open_contract' && msg.proposal_open_contract && !msg.error) {
       this.dispatchPoc(msg.proposal_open_contract as OpenContract);
     }
@@ -259,6 +265,13 @@ export class DerivSession extends EventEmitter implements TradingSession {
       }
     }
     if (msg.error) this.emit('apiError', msg.error);
+  }
+
+  private setBalance(value: unknown): void {
+    const n = Number(value);
+    if (value === undefined || value === null || !Number.isFinite(n)) return;
+    this.balance = n;
+    this.emit('balance', n);
   }
 
   private dispatchPoc(poc: OpenContract): void {

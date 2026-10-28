@@ -23,8 +23,8 @@ const under = (barrier: number): DigitOption => ({ contractType: 'DIGITUNDER', b
  */
 export const PRESETS: readonly BotConfig[] = [
   { ...BASE, id: 'even-odd', label: 'Pares/Ímpares (inteligente)', adaptive: true, options: [{ contractType: 'DIGITEVEN' }, { contractType: 'DIGITODD' }] },
-  { ...BASE, id: 'over-3', label: 'Superior a 3 (Over 3)', adaptive: false, options: [over(3)] },
-  { ...BASE, id: 'over-1', label: 'Superior a 1 (Over 1)', adaptive: false, options: [over(1)] },
+  { ...BASE, id: 'over-3', label: 'Scalper (Superior a 3)', adaptive: false, options: [over(3)] },
+  { ...BASE, id: 'over-1', label: 'Ethereum (Superior a 1)', adaptive: false, options: [over(1)] },
   { ...BASE, id: 'over3-under3', label: 'Superior/Inferior a 3 (inteligente)', adaptive: true, options: [over(3), under(3)] },
   { ...BASE, id: 'under-8', label: 'Abaixo de 8 (Under 8)', adaptive: false, options: [under(8)] },
   { ...BASE, id: 'under8-over7', label: 'Abaixo de 8 / Acima de 7 (inteligente)', adaptive: true, options: [under(8), over(7)] },

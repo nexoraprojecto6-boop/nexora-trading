@@ -10,7 +10,7 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react'
 import type { BotSummary, BotState, BotLogEntry, BotConfig, BotStrategyType, CatalogBot, WsStatus } from '../lib/types'
 import type { ManualBuyParams } from '../hooks/useNexoraWs'
-import { api, HttpError, type BotSettingsValues, type LiveBots } from '../lib/api'
+import { api, HttpError, type BotSettingsValues, type LiveBots, type LiveTick } from '../lib/api'
 import { toCatalogBot } from '../lib/mappers'
 import { useAuth } from './AuthContext'
 import { useTrading } from './TradingContext'
@@ -68,6 +68,8 @@ interface BotsCtx {
   trades: TradeRecord[]
   botTrades: Record<string, TradeRecord[]>
   openTrades: Record<string, TradeRecord>
+  /** Últimos ticks do mercado do bot (mais recente primeiro). */
+  ticks: LiveTick[]
   botLogs: Record<string, BotLogEntry[]>
   listCatalogBots: () => void
   listSessionBots: () => void
@@ -140,6 +142,7 @@ export function BotsProvider({ children }: { children: ReactNode }) {
   /** Sobe ao limpar o histórico: respostas pedidas antes são ignoradas (não repõem o que foi apagado). */
   const clearGen = useRef(0)
   const [openTrades, setOpenTrades] = useState<Record<string, TradeRecord>>({})
+  const [ticks, setTicks] = useState<LiveTick[]>([])
 
   const notify = useCallback((msg: StatusMessage) => {
     setStatusMessage(msg)
@@ -284,6 +287,11 @@ export function BotsProvider({ children }: { children: ReactNode }) {
       }
     }
     setOpenTrades(opens)
+    setTicks(live.ticks ?? [])
+    // Saldo em tempo real: vem do servidor a cada consulta (desconto ao comprar, crédito ao ganhar).
+    if (live.balance !== null && live.balance !== undefined && live.currency && live.accountId === currentAccount?.account_id) {
+      _setBalance(live.balance, live.currency)
+    }
     setTrades(live.trades.map(t => ({
       id: String(t.contractId),
       hora: new Date(t.at).toLocaleTimeString('pt-PT', { hour12: false }),
@@ -322,7 +330,7 @@ export function BotsProvider({ children }: { children: ReactNode }) {
         notify({ kind: st.stopReason === 'take_profit' ? 'success' : 'warning', title: `${nameOf(st.botId)} parou`, text: STOP_TEXT[st.stopReason] ?? st.lastError ?? 'O bot parou.' })
       }
     }
-  }, [catalogBots, notify])
+  }, [catalogBots, notify, currentAccount?.account_id, _setBalance])
 
   useEffect(() => {
     if (!isAuthenticated || isLoadingCatalog || catalogBots.length === 0) return
@@ -342,20 +350,30 @@ export function BotsProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated, isLoadingCatalog])
 
   const anyRunning = sessionBots.some(b => b.status === 'running' && RUNNABLE.has(b.id.replace(/^local-/, '')))
+// Depois de parar, continua a consultar mais uns segundos: a última ordem ainda liquida e o saldo muda.
+  const [pollTail, setPollTail] = useState(false)
   useEffect(() => {
-    if (!isAuthenticated || !anyRunning) return
+    if (anyRunning) { setPollTail(true); return }
+    const t = setTimeout(() => setPollTail(false), 4000)
+    return () => clearTimeout(t)
+  }, [anyRunning])
+
+  const fast = anyRunning || pollTail
+  const watching = isAuthenticated && (fast || (selectedBotId !== null && RUNNABLE.has(selectedBotId)))
+  useEffect(() => {
+    if (!watching) return
     let cancelled = false
     const tick = async () => {
       try {
         const gen = clearGen.current
         const live = await api.getBotsLive()
         if (!cancelled && gen === clearGen.current) applyLive(live)
-      } catch { /* falha pontual: tenta no próximo segundo */ }
+      } catch { /* falha pontual: tenta na próxima */ }
     }
     void tick()
-    const timer = setInterval(() => { void tick() }, LIVE_POLL_MS)
+    const timer = setInterval(() => { void tick() }, fast ? LIVE_POLL_MS : 1500)
     return () => { cancelled = true; clearInterval(timer) }
-  }, [isAuthenticated, anyRunning, applyLive])
+  }, [watching, fast, applyLive])
 
   const unavailable = useCallback(() => notify({ kind: 'info', title: 'Indisponível', text: UNAVAILABLE }), [notify])
   const manualBuy = useCallback((_params: ManualBuyParams) => {
@@ -377,7 +395,7 @@ export function BotsProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       catalogBots, isLoadingCatalog, sessionBots, botStates: {}, wsStatus, lastError, statusMessage,
-      trades, botTrades: {}, openTrades, botLogs: {},
+      trades, botTrades: {}, openTrades, ticks, botLogs: {},
       listCatalogBots: () => { void load() }, listSessionBots: noop,
       startCatalogBot, stopBot, pauseBot, resumeBot, deleteBot,
       getBotLogs: noop, clearTrades,

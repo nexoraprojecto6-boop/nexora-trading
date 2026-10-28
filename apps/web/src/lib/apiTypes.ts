@@ -187,7 +187,15 @@ export interface LiveTrade {
   at: number
 }
 
+export interface LiveTick {
+  quote: string
+  digit: number
+}
+
 export interface LiveBots {
+  balance: number | null
+  currency: string | null
+  ticks: LiveTick[]
   accountId: string | null
   bots: LiveBotStats[]
   trades: LiveTrade[]

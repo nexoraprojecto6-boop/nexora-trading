@@ -54,7 +54,9 @@ function formatTick(t: TradeRecord): string {
 }
 
 export function TradesTable() {
-  const { trades, clearTrades } = useBots()
+  const { trades, clearTrades, ticks: liveTicks } = useBots()
+  const ticks = liveTicks ?? []
+  const evenPct = ticks.length ? Math.round((ticks.filter(t => t.digit % 2 === 0).length / ticks.length) * 100) : 0
   const { currency } = useTrading()
   const [mainTab, setMainTab] = useState<MainTab>('trader')
   // casas decimais da moeda da conta (2 em USD/EUR, 8 em BTC...)
@@ -87,11 +89,35 @@ export function TradesTable() {
       {/* Painel de conteúdo — só esta área rola */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>
         {mainTab === 'notificacoes' && (
-          <EmptyState
-            icon={<IoNotificationsOutline size={26} />}
-            title="Sem notificações"
-            subtitle="Avisos de saldo, metas e stop loss aparecem aqui"
-          />
+          ticks.length === 0 ? (
+            <EmptyState
+              icon={<IoNotificationsOutline size={26} />}
+              title="Sem notificações"
+              subtitle="Escolha um bot: os últimos ticks do mercado aparecem aqui"
+            />
+          ) : (
+            <div style={{ padding: '12px 14px' }}>
+              <p style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 }}>
+                Últimos ticks
+              </p>
+              <div className="tabular" style={{ display: 'flex', gap: 14, fontSize: 13, color: 'var(--text-dim)', marginBottom: 12, flexWrap: 'wrap' }}>
+                <span>Último: <b style={{ color: '#fff' }}>{ticks[0]?.quote}</b></span>
+                <span>Pares: <b style={{ color: 'var(--blue-hi)' }}>{evenPct}%</b></span>
+                <span>Ímpares: <b style={{ color: 'var(--amber)' }}>{100 - evenPct}%</b></span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {ticks.map((t, i) => (
+                  <span key={`${t.quote}-${i}`} title={t.quote} className="tabular" style={{
+                    width: 30, height: 30, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 700, fontSize: 14, color: '#fff',
+                    background: t.digit % 2 === 0 ? 'rgba(59,130,246,0.28)' : 'rgba(245,158,11,0.28)',
+                    border: i === 0 ? '1px solid #fff' : '1px solid transparent',
+                  }}>{t.digit}</span>
+                ))}
+              </div>
+              <p style={{ color: 'var(--text-faint)', fontSize: 11, marginTop: 10 }}>O mais recente à esquerda. Azul = par, laranja = ímpar.</p>
+            </div>
+          )
         )}
 
         {mainTab === 'trader' && (

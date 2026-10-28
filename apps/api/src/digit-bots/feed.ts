@@ -83,6 +83,7 @@ export class DigitStats {
  */
 export class TickFeed extends EventEmitter {
   readonly stats = new DigitStats(HISTORY_COUNT);
+  private recent: { quote: string; digit: number }[] = [];
   private socket: SocketLike | null = null;
   private closed = false;
   private attempts = 0;
@@ -120,11 +121,18 @@ export class TickFeed extends EventEmitter {
         return;
       }
       if (m.msg_type === 'tick' && m.tick) {
-        this.stats.push(lastDigit(Number(m.tick.quote), Number(m.tick.pip_size ?? 2)));
+        const pip = Number(m.tick.pip_size ?? 2);
+        const digit = lastDigit(Number(m.tick.quote), pip);
+        this.stats.push(digit);
+        this.recent.push({ quote: Number(m.tick.quote).toFixed(Math.max(0, pip)), digit });
+        if (this.recent.length > 100) this.recent.shift();
         this.emit('update');
       } else if (m.msg_type === 'history' && Array.isArray(m.history?.prices)) {
         const pip = Number(m.pip_size ?? 2);
-        this.stats.seed((m.history.prices as unknown[]).map((p) => lastDigit(Number(p), pip)));
+        const prices = (m.history.prices as unknown[]).map(Number);
+        this.stats.seed(prices.map((p) => lastDigit(p, pip)));
+        const seeded = prices.map((p) => ({ quote: p.toFixed(Math.max(0, pip)), digit: lastDigit(p, pip) }));
+        this.recent = [...seeded, ...this.recent].slice(-100);
         this.emit('update');
       }
     };
@@ -140,6 +148,11 @@ export class TickFeed extends EventEmitter {
     const delay = Math.min(30_000, 1000 * 2 ** this.attempts++);
     this.timer = setTimeout(() => this.start(), delay);
     this.timer.unref?.();
+  }
+
+  /** Últimos ticks, do mais recente para o mais antigo. */
+  recentTicks(n = 40): { quote: string; digit: number }[] {
+    return this.recent.slice(-n).reverse();
   }
 
   get ready(): boolean {

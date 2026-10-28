@@ -21,6 +21,11 @@ export interface LiveState {
   readonly trades: TradeRecord[];
   /** Resultados desde o último "limpar histórico", por bot. */
   readonly totals: Record<string, Totals>;
+  /** Saldo atual da conta (em tempo real) e a moeda. */
+  readonly balance: number | null;
+  readonly currency: string | null;
+  /** Últimos ticks do mercado do bot, do mais recente para o mais antigo. */
+  readonly ticks: { quote: string; digit: number }[];
 }
 
 export interface BotRunner {
@@ -49,6 +54,7 @@ interface Entry {
   readonly token: string;
   readonly trades: TradeRecord[];
   totals: Record<string, Totals>;
+  symbol: string;
   lastUsed: number;
 }
 
@@ -109,7 +115,7 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
     if (entry === undefined) {
       const session = new DerivSession({ token, accountId: account.accountId, accountType: account.accountType, log });
       const manager = new BotManager({ session, log, feeds: (symbol) => feedFor(symbol).stats });
-      const created: Entry = { session, manager, accountId: account.accountId, token, trades: [], totals: {}, lastUsed: Date.now() };
+      const created: Entry = { session, manager, accountId: account.accountId, token, trades: [], totals: {}, symbol: "R_100", lastUsed: Date.now() };
       manager.on("trade", (trade: TradeRecord) => {
         created.trades.unshift(trade);
         if (created.trades.length > 200) created.trades.length = 200;
@@ -142,6 +148,7 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
     async warmUp({ userId, token, account, symbol }) {
       const entry = ensure(userId, token, account);
       if (!entry.ok) return entry;
+      entry.value.symbol = symbol;
       const feed = feedFor(symbol);
       const [connected] = await Promise.all([connect(entry.value), feed.whenReady(5000)]);
       return connected;
@@ -154,7 +161,8 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
       if (!connected.ok) return connected;
       // A 1.ª ordem já tem de sair analisada: espera (no máx. 5 s) pelos últimos dígitos e, num bot
       // inteligente, não arranca sem eles em vez de entrar às cegas.
-      const feed = feedFor(overrides.symbol ?? "R_100");
+      entry.value.symbol = overrides.symbol ?? "R_100";
+      const feed = feedFor(entry.value.symbol);
       await feed.whenReady(5000);
       if (!feed.ready && PRESETS.find((p) => p.id === botId)?.adaptive === true) {
         return err(new AppError("UPSTREAM", "Sem dados do mercado para analisar. Tente novamente dentro de instantes."));
@@ -174,9 +182,19 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
 
     state(userId) {
       const entry = entries.get(userId);
-      if (entry === undefined) return { accountId: null, bots: [], trades: [], totals: {} };
+      if (entry === undefined) return { accountId: null, bots: [], trades: [], totals: {}, balance: null, currency: null, ticks: [] };
       entry.lastUsed = Date.now();
-      return { accountId: entry.accountId, bots: entry.manager.status(), trades: entry.trades, totals: entry.totals };
+      const held = feeds.get(entry.symbol);
+      if (held !== undefined) held.lastUsed = Date.now();
+      return {
+        accountId: entry.accountId,
+        bots: entry.manager.status(),
+        trades: entry.trades,
+        totals: entry.totals,
+        balance: entry.session.balance,
+        currency: entry.session.currency,
+        ticks: held?.feed.recentTicks(40) ?? [],
+      };
     },
 
     clearHistory(userId) {
