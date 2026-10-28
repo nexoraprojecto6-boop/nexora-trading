@@ -5,6 +5,7 @@ import type { AuthConfig } from "../auth/config.js";
 import type { AuthService, SessionUser } from "../auth/service.js";
 import type { BotService } from "../bots/service.js";
 import type { BotRunner } from "../bots/runner.js";
+import { DEFAULT_SYMBOL } from "../digit-bots/presets.js";
 import { AppError } from "@nexora/shared";
 
 export interface BotRouteDeps {
@@ -153,7 +154,7 @@ export function registerBotRoutes(app: FastifyInstance, deps: BotRouteDeps): voi
     const { account, token } = await resolveAccount(ctx, request.body.accountId);
     const saved = await ctx.bots.getUserState(ctx.user.userId);
     const savedSymbol = saved.ok ? saved.value.config?.params["symbol"] : undefined;
-    const symbol = typeof savedSymbol === "string" ? savedSymbol : "R_100";
+    const symbol = typeof savedSymbol === "string" ? savedSymbol : DEFAULT_SYMBOL;
     const result = await ctx.runner.warmUp({ userId: ctx.user.userId, token, account, symbol });
     if (!result.ok) throw result.error;
     return reply.status(204).send();
@@ -169,14 +170,18 @@ export function registerBotRoutes(app: FastifyInstance, deps: BotRouteDeps): voi
       const botId = request.params.id;
       if (!ctx.runner.isRunnable(botId)) throw new AppError("VALIDATION", "Este bot não abre operações.");
 
-      const state = await ctx.bots.getUserState(ctx.user.userId);
+      // Estado guardado e token em paralelo (menos espera entre o Play e a primeira ordem).
+      const [state, resolved] = await Promise.all([
+        ctx.bots.getUserState(ctx.user.userId),
+        resolveAccount(ctx, request.body.accountId),
+      ]);
       if (!state.ok) throw state.error;
       const { selectedBotId, config } = state.value;
       if (selectedBotId !== botId || config === null) {
         throw new AppError("VALIDATION", "Guarde as configurações deste bot antes de iniciar.");
       }
 
-      const { account, token } = await resolveAccount(ctx, request.body.accountId);
+      const { account, token } = resolved;
       const risk = config.risk;
       const result = await ctx.runner.start({
         userId: ctx.user.userId,
@@ -184,14 +189,13 @@ export function registerBotRoutes(app: FastifyInstance, deps: BotRouteDeps): voi
         account,
         botId,
         overrides: {
-          symbol: String(config.params["symbol"] ?? "R_100"),
+          symbol: String(config.params["symbol"] ?? DEFAULT_SYMBOL),
           stake: Number(risk["stake"]),
           takeProfit: Number(risk["takeProfit"]),
           stopLoss: Number(risk["stopLoss"]),
           maxConsecutiveLosses: 0,
           maxTrades: 0,
           cooldownMs: 0,
-          stakeMultiplierOnLoss: 1,
         },
       });
       if (!result.ok) throw result.error;

@@ -1,5 +1,5 @@
 import { AppError, err, ok, type Result } from "@nexora/shared";
-import { BotManager, DerivSession, PRESETS, TickFeed, type BotConfig, type BotStats, type TradeRecord } from "../digit-bots/index.js";
+import { BotManager, DEFAULT_SYMBOL, DerivSession, PRESETS, TickFeed, type BotConfig, type BotStats, type TradeRecord } from "../digit-bots/index.js";
 
 export interface RunnerAccount {
   readonly accountId: string;
@@ -114,8 +114,8 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
     }
     if (entry === undefined) {
       const session = new DerivSession({ token, accountId: account.accountId, accountType: account.accountType, log });
-      const manager = new BotManager({ session, log, feeds: (symbol) => feedFor(symbol).stats });
-      const created: Entry = { session, manager, accountId: account.accountId, token, trades: [], totals: {}, symbol: "R_100", lastUsed: Date.now() };
+      const manager = new BotManager({ session, log, feeds: (symbol) => feedFor(symbol) });
+      const created: Entry = { session, manager, accountId: account.accountId, token, trades: [], totals: {}, symbol: DEFAULT_SYMBOL, lastUsed: Date.now() };
       manager.on("trade", (trade: TradeRecord) => {
         created.trades.unshift(trade);
         if (created.trades.length > 200) created.trades.length = 200;
@@ -161,7 +161,7 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
       if (!connected.ok) return connected;
       // A 1.ª ordem já tem de sair analisada: espera (no máx. 5 s) pelos últimos dígitos e, num bot
       // inteligente, não arranca sem eles em vez de entrar às cegas.
-      entry.value.symbol = overrides.symbol ?? "R_100";
+      entry.value.symbol = overrides.symbol ?? DEFAULT_SYMBOL;
       const feed = feedFor(entry.value.symbol);
       await feed.whenReady(5000);
       if (!feed.ready && PRESETS.find((p) => p.id === botId)?.adaptive === true) {

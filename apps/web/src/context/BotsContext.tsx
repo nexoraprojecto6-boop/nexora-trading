@@ -113,7 +113,7 @@ const ZERO_STATS = {
 }
 /** Bots que operam de verdade no servidor (os restantes só acompanham o mercado). */
 const RUNNABLE = new Set(['even-odd', 'over-3', 'over-1', 'over3-under3', 'under-8', 'under8-over7'])
-const LIVE_POLL_MS = 400
+const LIVE_POLL_MS = 300
 const STOP_TEXT: Record<string, string> = {
   stop_loss: 'Atingiu a perda máxima definida.',
   take_profit: 'Atingiu o lucro definido.',

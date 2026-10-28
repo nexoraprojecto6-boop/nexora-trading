@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { DigitBot } from './bot.js';
-import type { DigitStats } from './feed.js';
+import type { TickFeed } from './feed.js';
 import { buildBotConfig, PRESETS } from './presets.js';
 import { RateLimiter } from './rate-limiter.js';
 import type { BotConfig, BotStats, Limiter, TradeRecord, TradingSession } from './types.js';
@@ -11,8 +11,8 @@ export interface ManagerOptions {
   limiter?: Limiter;
   /** Overrides aplicados a todos os bots (ex.: { symbol: 'R_50', stake: 0.5 }). */
   defaults?: Partial<BotConfig>;
-  /** Estatística dos últimos dígitos de um símbolo (para os bots inteligentes). */
-  feeds?: (symbol: string) => DigitStats | undefined;
+  /** Fluxo de ticks (e estatística dos últimos dígitos) de um símbolo. */
+  feeds?: (symbol: string) => TickFeed | undefined;
   log?: (msg: string) => void;
 }
 
@@ -47,7 +47,7 @@ export class BotManager extends EventEmitter {
     const bot = new DigitBot(config, {
       session: this.opts.session,
       limiter: this.limiter,
-      stats: () => this.opts.feeds?.(config.symbol),
+      feed: () => this.opts.feeds?.(config.symbol),
       log: (m) => this.emitLog(m),
       onTrade: (t: TradeRecord) => this.emit('trade', t),
       onStop: (s: BotStats) => this.emit('stop', s),

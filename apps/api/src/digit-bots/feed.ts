@@ -49,34 +49,24 @@ export function expectedShare(o: DigitOption): number {
   }
 }
 
-export type TickListener = (digit: number, epoch: number) => void;
+export interface Tick {
+  digit: number;
+  quote: string;
+  /** Hora de chegada (ms). */
+  at: number;
+  /** Número de ordem do tick (cada tick é usado no máximo uma vez por bot). */
+  seq: number;
+}
 
-/** Janela rolante dos últimos dígitos, com subscrição a cada tick novo (usada pelo scalper). */
+/** Janela rolante dos últimos dígitos. */
 export class DigitStats {
   private window: number[] = [];
-  private listeners = new Set<TickListener>();
-  /** Último tick ao vivo recebido (não inclui o histórico inicial). */
-  last: { digit: number; epoch: number } | null = null;
 
   constructor(private readonly size = HISTORY_COUNT) {}
 
-  push(digit: number, epoch = 0): void {
+  push(digit: number): void {
     this.window.push(digit);
     if (this.window.length > this.size) this.window.shift();
-    this.last = { digit, epoch };
-    for (const fn of [...this.listeners]) {
-      try {
-        fn(digit, epoch);
-      } catch {
-        /* um ouvinte com erro não pode travar o fluxo de ticks */
-      }
-    }
-  }
-
-  /** Chama `fn` em cada tick novo. Devolve a função para cancelar. */
-  subscribe(fn: TickListener): () => void {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
   }
 
   /** Coloca o histórico ANTES dos ticks que já chegaram. */
@@ -103,6 +93,9 @@ export class DigitStats {
 export class TickFeed extends EventEmitter {
   readonly stats = new DigitStats(HISTORY_COUNT);
   private recent: { quote: string; digit: number }[] = [];
+  private seq = 0;
+  /** Último tick recebido ao vivo. */
+  lastTick: Tick | undefined;
   private socket: SocketLike | null = null;
   private closed = false;
   private attempts = 0;
@@ -142,10 +135,12 @@ export class TickFeed extends EventEmitter {
       if (m.msg_type === 'tick' && m.tick) {
         const pip = Number(m.tick.pip_size ?? 2);
         const digit = lastDigit(Number(m.tick.quote), pip);
-        // Regista o tick ANTES de avisar quem escuta, para `update`/`last` já refletirem este tick.
+        this.stats.push(digit);
         this.recent.push({ quote: Number(m.tick.quote).toFixed(Math.max(0, pip)), digit });
         if (this.recent.length > 100) this.recent.shift();
-        this.stats.push(digit, Number(m.tick.epoch ?? 0));
+        const tick: Tick = { digit, quote: Number(m.tick.quote).toFixed(Math.max(0, pip)), at: Date.now(), seq: ++this.seq };
+        this.lastTick = tick;
+        this.emit('tick', tick);
         this.emit('update');
       } else if (m.msg_type === 'history' && Array.isArray(m.history?.prices)) {
         const pip = Number(m.pip_size ?? 2);

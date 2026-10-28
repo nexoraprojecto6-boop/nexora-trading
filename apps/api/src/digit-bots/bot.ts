@@ -1,5 +1,5 @@
 import { DerivApiError } from './errors.js';
-import { expectedShare, MIN_SAMPLE, optionPredicate, type DigitStats } from './feed.js';
+import { expectedShare, MIN_SAMPLE, optionPredicate, type Tick, type TickFeed } from './feed.js';
 import type {
   BotConfig,
   BotStats,
@@ -19,24 +19,22 @@ export interface BotDeps {
   onStop?: (stats: BotStats) => void;
   log?: (msg: string) => void;
   /** Dígitos recentes do símbolo do bot (já em memória: a análise é instantânea). */
-  stats?: () => DigitStats | undefined;
+  feed?: () => TickFeed | undefined;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
   /** Tempo máximo à espera da liquidação de um contrato de 1 tick. */
   settleTimeoutMs?: number;
 }
 
+const MIN_STAKE = 0.35;
 const round2 = (n: number) => Math.round(n * 100) / 100;
-const ceil2 = (n: number) => Math.ceil(n * 100 - 1e-9) / 100;
+const optionKey = (o: DigitOption) => `${o.contractType}:${o.barrier ?? ''}`;
 const num = (v: unknown): number => (v === undefined || v === null ? NaN : Number(v));
 
 /**
- * Um bot de dígitos.
- *
- * - `sequential` (omissão): ao fazer start() compra IMEDIATAMENTE (`buy: 1` + `parameters`, uma
- *   única ida-e-volta) e, assim que o contrato de 1 tick liquida, compra o seguinte.
- * - `scalper`: subscreve cada tick; em cada tick cujo último dígito cumpre a condição compra logo,
- *   SEM esperar a liquidação do contrato anterior e sem martingale.
+ * Um bot de dígitos. Ao fazer start() compra IMEDIATAMENTE (sem esperar tick nem
+ * proposta: usa `buy: 1` + `parameters`, uma única ida-e-volta) e, assim que o
+ * contrato de 1 tick liquida, compra o seguinte, até atingir um limite de risco.
  */
 export class DigitBot {
   private status: BotStatus = 'idle';
@@ -53,18 +51,13 @@ export class DigitBot {
   private stake: number;
   private latencies: number[] = [];
   private open: { contractId: number; stake: number; at: number } | null = null;
-
-  // martingale inteligente
-  private lossAcc = 0;
-  private mgStep = 0;
-  private payoutRatio = 0; // lucro por unidade de stake (payout/stake - 1), aprendido nos recibos
-
-  // scalper
-  private inFlight = 0;
-  private lastEpoch = -1;
-  private unsubTicks?: () => void;
-  private stopLoop?: () => void;
-  private pending = new Set<Promise<void>>();
+  /** Martingale: perdas acumuladas da série atual, nível e pagamento observado por contrato. */
+  private lossSum = 0;
+  private step = 0;
+  private readonly ratios = new Map<string, number>();
+  /** Último tick já usado como gatilho (cada tick dispara no máximo uma entrada). */
+  private usedSeq = -1;
+  private wake?: () => void;
 
   private readonly now: () => number;
   private readonly sleep: (ms: number) => Promise<void>;
@@ -82,10 +75,6 @@ export class DigitBot {
     this.settleTimeoutMs = deps.settleTimeoutMs ?? 20_000;
   }
 
-  private get isScalper(): boolean {
-    return this.config.mode === 'scalper';
-  }
-
   get isRunning(): boolean {
     return this.status === 'running';
   }
@@ -96,17 +85,16 @@ export class DigitBot {
     this.stopReason = undefined;
     this.lastError = undefined;
     this.consecutiveErrors = 0;
-    this.lastEpoch = -1;
-    this.loop = this.isScalper ? this.runScalper() : this.run();
+    this.loop = this.run();
     return this.loop;
   }
 
-  /** Pede paragem; as operações em curso (se houver) terminam e são contabilizadas. */
+  /** Pede paragem; a operação em curso (se houver) termina e é contabilizada. */
   async stop(reason: StopReason = 'manual'): Promise<void> {
     if (this.status !== 'running') return;
     this.finish(reason);
+    this.wake?.();
     await this.loop;
-    await Promise.allSettled([...this.pending]);
   }
 
   stats(): BotStats {
@@ -124,7 +112,6 @@ export class DigitBot {
       profit: round2(this.profit),
       consecutiveLosses: this.consecutiveLosses,
       currentStake: this.stake,
-      martingaleStep: this.mgStep,
       lastLatencyMs: n ? this.latencies[n - 1]! : null,
       avgLatencyMs: n ? Math.round(this.latencies.reduce((a, b) => a + b, 0) / n) : null,
       ...(this.open ? { open: this.open } : {}),
@@ -136,25 +123,20 @@ export class DigitBot {
     this.status = 'stopped';
     this.stopReason = reason;
     if (err) this.lastError = err instanceof Error ? err.message : String(err);
-    this.unsubTicks?.();
-    this.unsubTicks = undefined;
     this.log(`[${this.config.id}] parado: ${reason}${this.lastError ? ` (${this.lastError})` : ''}`);
     this.deps.onStop?.(this.stats());
-    this.stopLoop?.();
   }
 
-  private limitReached(extraTrades = 0): StopReason | null {
+  private limitReached(): StopReason | null {
     const c = this.config;
     if (c.stopLoss > 0 && this.profit <= -c.stopLoss) return 'stop_loss';
     if (c.takeProfit > 0 && this.profit >= c.takeProfit) return 'take_profit';
     if (c.maxConsecutiveLosses > 0 && this.consecutiveLosses >= c.maxConsecutiveLosses) {
       return 'max_consecutive_losses';
     }
-    if (c.maxTrades > 0 && this.trades + extraTrades >= c.maxTrades) return 'max_trades';
+    if (c.maxTrades > 0 && this.trades >= c.maxTrades) return 'max_trades';
     return null;
   }
-
-  // ───────────────────────── Modo sequencial ─────────────────────────
 
   private async run(): Promise<void> {
     try {
@@ -165,6 +147,9 @@ export class DigitBot {
           this.finish(limit);
           break;
         }
+        // Bot com gatilho (Scalper): entra no tick em que o último dígito cumpre a condição.
+        if (this.config.trigger && !(await this.awaitTrigger())) break;
+        if (this.status !== 'running') break;
         await this.deps.limiter.acquire();
         if (this.status !== 'running') break;
         await this.tradeOnce();
@@ -178,16 +163,53 @@ export class DigitBot {
   }
 
   /**
+   * Espera o gatilho. Se o último tick (recente e ainda não usado) já cumpre a condição, entra no
+   * mesmo instante; senão entra no primeiro tick seguinte que a cumpra. Sem pausa entre entradas.
+   */
+  private awaitTrigger(): Promise<boolean> {
+    const below = this.config.trigger!.below;
+    const feed = this.deps.feed?.();
+    if (!feed) return Promise.reject(new Error('Sem ticks do mercado para o gatilho.'));
+    const last = feed.lastTick;
+    if (last && last.seq !== this.usedSeq && this.now() - last.at < 3000 && last.digit < below) {
+      this.usedSeq = last.seq;
+      return Promise.resolve(true);
+    }
+    return new Promise<boolean>((resolve, reject) => {
+      const cleanup = () => {
+        feed.off('tick', onTick);
+        clearTimeout(timer);
+        this.wake = undefined;
+      };
+      const onTick = (t: Tick) => {
+        if (t.seq === this.usedSeq || !(t.digit < below)) return;
+        this.usedSeq = t.seq;
+        cleanup();
+        resolve(true);
+      };
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('Sem ticks do mercado há 30 s.'));
+      }, 30_000);
+      this.wake = () => {
+        cleanup();
+        resolve(false);
+      };
+      feed.on('tick', onTick);
+    });
+  }
+
+  /**
    * Escolhe a opção da próxima ordem. Um bot inteligente nunca entra às cegas: se ainda faltam
    * dígitos, espera até 3 s por eles e, não os havendo, pára com erro em vez de arriscar.
    */
   private async choose(): Promise<{ option: DigitOption; pct: number | null }> {
     const first = this.config.options[0]!;
-    let stats = this.deps.stats?.();
+    let stats = this.deps.feed?.()?.stats;
     if (this.config.adaptive) {
       for (let i = 0; i < 30 && this.status === 'running' && (!stats || stats.count < MIN_SAMPLE); i++) {
         await this.sleep(100);
-        stats = this.deps.stats?.();
+        stats = this.deps.feed?.()?.stats;
       }
       if (this.status === 'running' && (!stats || stats.count < MIN_SAMPLE)) {
         throw new Error('Sem dados do mercado para analisar. Tente novamente.');
@@ -225,18 +247,19 @@ export class DigitBot {
   }
 
   private async tradeOnce(): Promise<void> {
-    const stake = this.stake;
     const pick = await this.choose();
     if (this.status !== 'running') return;
-    await this.buyAndSettle(pick.option, stake, pick.pct);
-  }
-
-  /** Compra, espera a liquidação e regista. Partilhado pelo modo sequencial e pelo scalper. */
-  private async buyAndSettle(option: DigitOption, stake: number, pickPct: number | null): Promise<void> {
+    const stake = this.planStake(pick.option);
+    if (stake === null) {
+      const room = this.config.stopLoss > 0 ? this.config.stopLoss + this.profit : Infinity;
+      this.finish(room < MIN_STAKE ? 'stop_loss' : 'insufficient_balance');
+      return;
+    }
+    this.stake = stake;
     const t0 = this.now();
     let receipt: any;
     try {
-      const res = await this.deps.session.request(this.buyMessage(option, stake));
+      const res = await this.deps.session.request(this.buyMessage(pick.option, stake));
       receipt = res.buy;
       if (!receipt) throw new Error('Resposta de compra sem recibo');
       this.consecutiveErrors = 0;
@@ -245,22 +268,22 @@ export class DigitBot {
       return;
     }
     const latency = this.now() - t0;
-    const buyPrice = num(receipt.buy_price);
-    const payout = num(receipt.payout);
-    if (buyPrice > 0 && payout > buyPrice) this.payoutRatio = payout / buyPrice - 1;
     this.open = { contractId: receipt.contract_id, stake, at: this.now() };
+    // Pagamento real deste contrato (base do martingale inteligente).
+    const ratio = (num(receipt.payout) - stake) / stake;
+    if (Number.isFinite(ratio) && ratio > 0) this.ratios.set(optionKey(pick.option), ratio);
 
     let poc: OpenContract;
     try {
       poc = await this.waitSettlement(receipt.contract_id);
     } catch (e) {
-      if (this.open?.contractId === receipt.contract_id) this.open = null;
+      this.open = null;
       // Estado incerto: não repetimos a compra às cegas.
       this.finish('error', e);
       return;
     }
 
-    if (this.open?.contractId === receipt.contract_id) this.open = null;
+    this.open = null;
     const status = String(poc.status ?? '');
     let profit = num(poc.profit);
     if (Number.isNaN(profit)) profit = num(poc.sell_price) - num(poc.buy_price);
@@ -274,13 +297,21 @@ export class DigitBot {
     if (won) {
       this.wins += 1;
       this.consecutiveLosses = 0;
-      this.lossAcc = 0;
-      this.mgStep = 0;
+      this.lossSum = 0;
+      this.step = 0;
       this.stake = this.config.stake;
     } else {
       this.losses += 1;
       this.consecutiveLosses += 1;
-      this.stake = this.isScalper ? this.config.stake : this.nextStakeAfterLoss(stake);
+      if (this.config.martingale) {
+        this.lossSum += stake;
+        this.step += 1;
+        if (this.step > this.config.martingaleMaxSteps) {
+          // Série demasiado longa: aceita a perda e recomeça no stake inicial.
+          this.lossSum = 0;
+          this.step = 0;
+        }
+      }
     }
 
     const balanceAfter = typeof receipt.balance_after === 'number' ? receipt.balance_after : null;
@@ -288,9 +319,9 @@ export class DigitBot {
     const record: TradeRecord = {
       botId: this.config.id,
       contractId: receipt.contract_id,
-      contractType: option.contractType,
-      ...(option.barrier !== undefined ? { barrier: option.barrier } : {}),
-      ...(pickPct !== null ? { pickPct } : {}),
+      contractType: pick.option.contractType,
+      ...(pick.option.barrier !== undefined ? { barrier: pick.option.barrier } : {}),
+      ...(pick.pct !== null ? { pickPct: pick.pct } : {}),
       stake,
       payout: num(receipt.payout),
       profit: round2(profit),
@@ -307,83 +338,23 @@ export class DigitBot {
   }
 
   /**
-   * Stake após uma perda.
-   * - smartMartingale: calcula a stake que recupera TODA a perda acumulada + lucro alvo, com o retorno
-   *   real do contrato. Corta a sequência (volta à base) se passar dos passos ou do teto de stake,
-   *   em vez de perseguir a perda sem fim.
-   * - antigo: multiplica por stakeMultiplierOnLoss (1 = desligado).
+   * Stake da próxima ordem. Martingale inteligente: depois de perder, o stake é o que recupera as
+   * perdas da série + o stake inicial com o pagamento real do contrato, limitado a 3x o stake
+   * anterior, a 40x o inicial, ao que resta do stop loss e ao saldo. Devolve null se não há margem.
    */
-  private nextStakeAfterLoss(lastStake: number): number {
+  private planStake(option: DigitOption): number | null {
     const c = this.config;
-    if (c.smartMartingale) {
-      this.lossAcc += lastStake;
-      this.mgStep += 1;
-      const cut = () => {
-        this.lossAcc = 0;
-        this.mgStep = 0;
-        return c.stake;
-      };
-      if (this.mgStep > (c.martingaleMaxSteps ?? 4)) return cut();
-      const target = this.lossAcc + c.stake * (c.martingaleProfitMult ?? 1);
-      // Sem retorno conhecido ainda (1.ª perda sem recibo útil): dobra como fallback.
-      const raw = this.payoutRatio > 0 ? target / this.payoutRatio : lastStake * 2;
-      const next = Math.max(c.stake, ceil2(raw));
-      if (c.maxStake > 0 && next > c.maxStake) return cut();
-      return next;
+    let stake = c.stake;
+    if (c.martingale && this.step > 0) {
+      const ratio = this.ratios.get(optionKey(option)) ?? Math.max(0.05, 0.95 / expectedShare(option) - 1);
+      stake = Math.min((this.lossSum + c.stake) / ratio, this.stake * 3, c.stake * 40);
     }
-    if (c.stakeMultiplierOnLoss <= 1) return c.stake;
-    const next = round2(lastStake * c.stakeMultiplierOnLoss);
-    return next > c.maxStake ? c.stake : next;
+    if (c.stopLoss > 0) stake = Math.min(stake, c.stopLoss + this.profit);
+    const balance = this.deps.session.balance;
+    if (typeof balance === 'number') stake = Math.min(stake, balance);
+    stake = Math.floor(stake * 100) / 100;
+    return stake >= MIN_STAKE ? stake : null;
   }
-
-  // ───────────────────────── Modo scalper ─────────────────────────
-
-  private runScalper(): Promise<void> {
-    return new Promise<void>((resolve) => {
-      this.stopLoop = resolve;
-      void (async () => {
-        try {
-          await this.deps.session.ready();
-          const stats = this.deps.stats?.();
-          if (!stats) throw new Error('Sem fluxo de ticks para o scalper. Tente novamente.');
-          if (this.status !== 'running') return;
-          this.unsubTicks = stats.subscribe((digit, epoch) => this.onScalperTick(digit, epoch));
-          // Clique = entrada imediata: avalia já o último tick conhecido.
-          if (stats.last) this.onScalperTick(stats.last.digit, stats.last.epoch);
-        } catch (e) {
-          this.finish('error', e);
-        }
-      })();
-    });
-  }
-
-  private onScalperTick(digit: number, epoch: number): void {
-    if (this.status !== 'running') return;
-    const limit = this.limitReached(this.inFlight);
-    if (limit) return this.finish(limit);
-    if (digit >= (this.config.scalperBelow ?? 3)) return;
-    if (epoch !== 0 && epoch === this.lastEpoch) return; // no máximo 1 compra por tick
-    if (this.inFlight >= (this.config.maxOpen ?? 3)) return;
-    this.lastEpoch = epoch;
-    this.inFlight += 1;
-    let p: Promise<void> | undefined;
-    p = (async () => {
-      try {
-        await Promise.resolve(); // garante que `p` já está atribuído antes de qualquer finally
-        await this.deps.limiter.acquire();
-        if (this.status !== 'running') return;
-        await this.buyAndSettle(this.config.options[0]!, this.config.stake, null);
-      } catch (e) {
-        this.finish('error', e);
-      } finally {
-        this.inFlight -= 1;
-        this.pending.delete(p!);
-      }
-    })();
-    this.pending.add(p);
-  }
-
-  // ───────────────────────── Comum ─────────────────────────
 
   private async handleBuyError(e: unknown): Promise<void> {
     const msg = e instanceof Error ? e.message : String(e);
@@ -402,8 +373,7 @@ export class DigitBot {
     this.consecutiveErrors += 1;
     this.log(`[${this.config.id}] erro na compra (${this.consecutiveErrors}/5): ${msg}`);
     if (this.consecutiveErrors >= 5) return this.finish('error', e);
-    // No scalper não se espera: o próximo tick já é a nova tentativa.
-    if (!this.isScalper) await this.sleep(500);
+    await this.sleep(500);
   }
 
   private waitSettlement(contractId: number): Promise<OpenContract> {

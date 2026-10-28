@@ -44,7 +44,7 @@ export const RISK_PARAMS: readonly ParamDef[] = [
  * Nenhum bot deste catálogo promete lucro.
  */
 const DIGIT_PARAMS: readonly ParamDef[] = [
-  { kind: "symbol", key: "symbol", label: "Mercado", default: "R_100" },
+  { kind: "symbol", key: "symbol", label: "Mercado", default: "1HZ100V" },
 ];
 
 /** Os 3 campos que importam nos bots de dígitos. Sem valor por omissão: o utilizador preenche. */
@@ -60,8 +60,8 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
     name: "Pares/Ímpares (inteligente)",
     summary: "Escolhe pares ou ímpares conforme a percentagem recente.",
     description:
-      "ENTRADA: Pares (DIGITEVEN) ou Ímpares (DIGITODD). ANÁLISE: antes de cada ordem compara a percentagem de dígitos pares e ímpares nos últimos 100 ticks (os últimos 20 pesam mais) e entra no lado mais forte. " +
-      "Contratos de 1 tick: a ligação e a análise dos últimos 100 dígitos ficam prontas antes do Play, por isso a primeira ordem sai logo que carrega e a seguinte entra assim que a anterior termina. " +
+      "ENTRADA: Pares (DIGITEVEN) ou Ímpares (DIGITODD). ANÁLISE: antes de cada ordem compara a percentagem de pares e ímpares nos últimos 100 ticks (os últimos 20 pesam mais) e entra no lado mais forte. MARTINGALE INTELIGENTE: depois de uma perda, o stake sobe para recuperar as perdas da série mais o stake inicial (com o pagamento real do contrato), até 4 níveis e nunca acima do que resta do stop loss; ao ganhar volta ao stake inicial. " +
+      "Contratos de 1 tick; a ligação e a análise ficam prontas antes do Play, por isso entra logo que carrega e a seguinte sai assim que a anterior fecha, sem pausa. Use um mercado de 1 segundo (1HZ) para operar mais depressa. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
     riskParams: DIGIT_RISK,
@@ -69,10 +69,10 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
   {
     id: "over-3",
     name: "Scalper (Superior a 3)",
-    summary: "Aposta que o próximo dígito é maior que 3.",
+    summary: "Entra em Over 3 quando o último dígito é inferior a 3.",
     description:
-      "ENTRADA: DIGITOVER com barreira 3 (ganha se o dígito final for 4 a 9). Sem análise: entra sempre neste contrato. " +
-      "Contratos de 1 tick: a ligação e a análise dos últimos 100 dígitos ficam prontas antes do Play, por isso a primeira ordem sai logo que carrega e a seguinte entra assim que a anterior termina. " +
+      "ENTRADA: DIGITOVER com barreira 3 (ganha se o próximo dígito for 4 a 9), só quando o último dígito é inferior a 3 (0, 1 ou 2). Se já estiver assim ao carregar em Play, entra no mesmo instante e volta a entrar de seguida sempre que o último dígito for inferior a 3, sem esperar. Sem martingale: stake sempre igual. " +
+      "Contratos de 1 tick; a ligação e a análise ficam prontas antes do Play, por isso entra logo que carrega e a seguinte sai assim que a anterior fecha, sem pausa. Use um mercado de 1 segundo (1HZ) para operar mais depressa. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
     riskParams: DIGIT_RISK,
@@ -82,8 +82,8 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
     name: "Ethereum (Superior a 1)",
     summary: "Aposta que o próximo dígito é maior que 1.",
     description:
-      "ENTRADA: DIGITOVER com barreira 1 (ganha se o dígito final for 2 a 9). Sem análise: entra sempre neste contrato. " +
-      "Contratos de 1 tick: a ligação e a análise dos últimos 100 dígitos ficam prontas antes do Play, por isso a primeira ordem sai logo que carrega e a seguinte entra assim que a anterior termina. " +
+      "ENTRADA: DIGITOVER com barreira 1 (ganha se o dígito final for 2 a 9), sem parar entre ordens. MARTINGALE INTELIGENTE: depois de uma perda, o stake sobe para recuperar as perdas da série mais o stake inicial (com o pagamento real do contrato), até 4 níveis e nunca acima do que resta do stop loss; ao ganhar volta ao stake inicial. " +
+      "Contratos de 1 tick; a ligação e a análise ficam prontas antes do Play, por isso entra logo que carrega e a seguinte sai assim que a anterior fecha, sem pausa. Use um mercado de 1 segundo (1HZ) para operar mais depressa. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
     riskParams: DIGIT_RISK,
@@ -93,8 +93,8 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
     name: "Superior/Inferior a 3 (inteligente)",
     summary: "Alterna entre acima e abaixo de 3 conforme a percentagem.",
     description:
-      "ENTRADA: Superior a 3 (dígitos 4 a 9) ou Inferior a 3 (dígitos 0 a 2). ANÁLISE: antes de cada ordem vê qual dos dois lados está mais forte, face ao normal, nos últimos 100 ticks (os últimos 20 pesam mais) e entra nesse. " +
-      "Contratos de 1 tick: a ligação e a análise dos últimos 100 dígitos ficam prontas antes do Play, por isso a primeira ordem sai logo que carrega e a seguinte entra assim que a anterior termina. " +
+      "ENTRADA: Superior a 3 (dígitos 4 a 9) ou Inferior a 3 (dígitos 0 a 2). ANÁLISE: antes de cada ordem vê qual dos dois lados está mais forte, face ao normal, nos últimos 100 ticks (os últimos 20 pesam mais) e entra nesse. MARTINGALE INTELIGENTE: depois de uma perda, o stake sobe para recuperar as perdas da série mais o stake inicial (com o pagamento real do contrato), até 4 níveis e nunca acima do que resta do stop loss; ao ganhar volta ao stake inicial. " +
+      "Contratos de 1 tick; a ligação e a análise ficam prontas antes do Play, por isso entra logo que carrega e a seguinte sai assim que a anterior fecha, sem pausa. Use um mercado de 1 segundo (1HZ) para operar mais depressa. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
     riskParams: DIGIT_RISK,
@@ -104,8 +104,8 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
     name: "Abaixo de 8 (Under 8)",
     summary: "Aposta que o próximo dígito é menor que 8.",
     description:
-      "ENTRADA: DIGITUNDER com barreira 8 (ganha se o dígito final for 0 a 7). Sem análise: entra sempre neste contrato. " +
-      "Contratos de 1 tick: a ligação e a análise dos últimos 100 dígitos ficam prontas antes do Play, por isso a primeira ordem sai logo que carrega e a seguinte entra assim que a anterior termina. " +
+      "ENTRADA: DIGITUNDER com barreira 8 (ganha se o dígito final for 0 a 7), sem parar entre ordens. MARTINGALE INTELIGENTE: depois de uma perda, o stake sobe para recuperar as perdas da série mais o stake inicial (com o pagamento real do contrato), até 4 níveis e nunca acima do que resta do stop loss; ao ganhar volta ao stake inicial. " +
+      "Contratos de 1 tick; a ligação e a análise ficam prontas antes do Play, por isso entra logo que carrega e a seguinte sai assim que a anterior fecha, sem pausa. Use um mercado de 1 segundo (1HZ) para operar mais depressa. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
     riskParams: DIGIT_RISK,
@@ -115,8 +115,8 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
     name: "Abaixo de 8 / Acima de 7 (inteligente)",
     summary: "Alterna entre abaixo de 8 e acima de 7 conforme a percentagem.",
     description:
-      "ENTRADA: Abaixo de 8 (dígitos 0 a 7) ou Acima de 7 (dígitos 8 e 9). ANÁLISE: antes de cada ordem vê qual dos dois lados está mais forte, face ao normal, nos últimos 100 ticks (os últimos 20 pesam mais) e entra nesse. " +
-      "Contratos de 1 tick: a ligação e a análise dos últimos 100 dígitos ficam prontas antes do Play, por isso a primeira ordem sai logo que carrega e a seguinte entra assim que a anterior termina. " +
+      "ENTRADA: Abaixo de 8 (dígitos 0 a 7) ou Acima de 7 (dígitos 8 e 9). ANÁLISE: antes de cada ordem vê qual dos dois lados está mais forte, face ao normal, nos últimos 100 ticks (os últimos 20 pesam mais) e entra nesse. MARTINGALE INTELIGENTE: depois de uma perda, o stake sobe para recuperar as perdas da série mais o stake inicial (com o pagamento real do contrato), até 4 níveis e nunca acima do que resta do stop loss; ao ganhar volta ao stake inicial. " +
+      "Contratos de 1 tick; a ligação e a análise ficam prontas antes do Play, por isso entra logo que carrega e a seguinte sai assim que a anterior fecha, sem pausa. Use um mercado de 1 segundo (1HZ) para operar mais depressa. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
     riskParams: DIGIT_RISK,
