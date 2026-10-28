@@ -1,0 +1,31 @@
+{
+  "name": "@nexora/digit-bots",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bots de dígitos da Deriv (Over/Under, Differs, Even/Odd) com entrada imediata e gestão de risco.",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "bin": {
+    "nexora-digit-bots": "./dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json && node --test \"dist/test/*.test.js\"",
+    "start": "node dist/src/cli.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}
