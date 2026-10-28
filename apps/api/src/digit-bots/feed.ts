@@ -49,15 +49,34 @@ export function expectedShare(o: DigitOption): number {
   }
 }
 
-/** Janela rolante dos últimos dígitos. */
+export type TickListener = (digit: number, epoch: number) => void;
+
+/** Janela rolante dos últimos dígitos, com subscrição a cada tick novo (usada pelo scalper). */
 export class DigitStats {
   private window: number[] = [];
+  private listeners = new Set<TickListener>();
+  /** Último tick ao vivo recebido (não inclui o histórico inicial). */
+  last: { digit: number; epoch: number } | null = null;
 
   constructor(private readonly size = HISTORY_COUNT) {}
 
-  push(digit: number): void {
+  push(digit: number, epoch = 0): void {
     this.window.push(digit);
     if (this.window.length > this.size) this.window.shift();
+    this.last = { digit, epoch };
+    for (const fn of [...this.listeners]) {
+      try {
+        fn(digit, epoch);
+      } catch {
+        /* um ouvinte com erro não pode travar o fluxo de ticks */
+      }
+    }
+  }
+
+  /** Chama `fn` em cada tick novo. Devolve a função para cancelar. */
+  subscribe(fn: TickListener): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
   }
 
   /** Coloca o histórico ANTES dos ticks que já chegaram. */
@@ -123,9 +142,10 @@ export class TickFeed extends EventEmitter {
       if (m.msg_type === 'tick' && m.tick) {
         const pip = Number(m.tick.pip_size ?? 2);
         const digit = lastDigit(Number(m.tick.quote), pip);
-        this.stats.push(digit);
+        // Regista o tick ANTES de avisar quem escuta, para `update`/`last` já refletirem este tick.
         this.recent.push({ quote: Number(m.tick.quote).toFixed(Math.max(0, pip)), digit });
         if (this.recent.length > 100) this.recent.shift();
+        this.stats.push(digit, Number(m.tick.epoch ?? 0));
         this.emit('update');
       } else if (m.msg_type === 'history' && Array.isArray(m.history?.prices)) {
         const pip = Number(m.pip_size ?? 2);
