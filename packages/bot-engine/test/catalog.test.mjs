@@ -23,12 +23,16 @@ for (const bot of BOT_CATALOG) {
   const defaults = Object.fromEntries(bot.params.filter((p) => p.default !== undefined).map((p) => [p.key, p.default]));
   assert.ok(validateParams(bot.params, defaults).ok, `padrões inválidos em ${bot.id}`);
 }
-assert.equal(findBot("observador").id, "observador"); assert.equal(findBot("nao-existe"), undefined); assert.equal(findBot("__proto__"), undefined);
+assert.equal(findBot("over-3").id, "over-3"); assert.equal(findBot("nao-existe"), undefined); assert.equal(findBot("__proto__"), undefined);
 // nenhum limite de risco tem valor por omissão
 for (const r of RISK_PARAMS) assert.equal(r.default, undefined, r.key);
 
 // ---- validação de parâmetros ----
-const bot = findBot("observador");
+// Bot de teste com 2 parâmetros e os limites gerais (o catálogo real usa limites próprios).
+const bot = { id: "teste", name: "t", summary: "t", description: "t", params: [
+  { kind: "symbol", key: "symbol", label: "Símbolo", default: "R_100" },
+  { kind: "select", key: "candleSeconds", label: "Candle", options: [{ value: "60", label: "1 min" }, { value: "120", label: "2 min" }, { value: "300", label: "5 min" }], default: "60" },
+] };
 const risk = { stake: "1.50", maxDailyLoss: "10", maxTradesPerDay: 20, maxOpenPositions: 1, maxConsecutiveLosses: 3, cooldownSeconds: 60 };
 let r = validateBotConfig(bot, { params: {}, risk });                 // usa os padrões do bot
 assert.ok(r.ok, JSON.stringify(r.error)); assert.deepEqual(r.value.params, { symbol: "R_100", candleSeconds: "60" });
@@ -69,4 +73,9 @@ assert.equal(validateBotConfig(bot, { params: [], risk }).ok, false);
 assert.ok(Object.keys(errs({ params: { symbol: "!" }, risk: { ...risk, stake: "0", maxTradesPerDay: 0 } })).length >= 3);
 // a validação não altera o objeto original
 const original = { params: {}, risk: { ...risk } }; const copy = JSON.stringify(original); validateBotConfig(bot, original); assert.equal(JSON.stringify(original), copy);
+// bots de dígitos: só 3 limites (stake, take profit, stop loss)
+const dig = findBot("even-odd");
+assert.ok(validateBotConfig(dig, { params: {}, risk: { stake: "1", takeProfit: "10", stopLoss: "20" } }).ok);
+assert.equal(validateBotConfig(dig, { params: {}, risk: { stake: "1", takeProfit: "10" } }).ok, false);
+assert.equal(validateBotConfig(dig, { params: {}, risk: { stake: "5", takeProfit: "10", stopLoss: "2" } }).ok, false);
 console.log("OK: catálogo e validação");

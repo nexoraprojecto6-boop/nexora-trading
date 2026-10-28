@@ -149,17 +149,29 @@ export class DigitBot {
     }
   }
 
-  /** Escolhe a opção da próxima ordem. Sem análise disponível, entra logo na primeira (nunca espera). */
-  private choose(): { option: DigitOption; pct: number | null } {
+  /**
+   * Escolhe a opção da próxima ordem. Um bot inteligente nunca entra às cegas: se ainda faltam
+   * dígitos, espera até 3 s por eles e, não os havendo, pára com erro em vez de arriscar.
+   */
+  private async choose(): Promise<{ option: DigitOption; pct: number | null }> {
     const first = this.config.options[0]!;
-    const stats = this.deps.stats?.();
+    let stats = this.deps.stats?.();
+    if (this.config.adaptive) {
+      for (let i = 0; i < 30 && this.status === 'running' && (!stats || stats.count < MIN_SAMPLE); i++) {
+        await this.sleep(100);
+        stats = this.deps.stats?.();
+      }
+      if (this.status === 'running' && (!stats || stats.count < MIN_SAMPLE)) {
+        throw new Error('Sem dados do mercado para analisar. Tente novamente.');
+      }
+    }
     if (!stats || stats.count < MIN_SAMPLE) return { option: first, pct: null };
     const candidates = this.config.adaptive ? this.config.options : [first];
     let best = first;
     let bestScore = -Infinity;
     for (const o of candidates) {
       const pred = optionPredicate(o);
-      // Força relativa: quanto o lado está acima do normal (últimos 20 ticks pesam mais que os 100).
+      // Força relativa: quanto o lado está acima do normal (os últimos 20 ticks pesam mais que os 100).
       const score = (0.6 * stats.share(pred, 20) + 0.4 * stats.share(pred)) / expectedShare(o);
       if (score > bestScore) {
         best = o;
@@ -186,7 +198,8 @@ export class DigitBot {
 
   private async tradeOnce(): Promise<void> {
     const stake = this.stake;
-    const pick = this.choose();
+    const pick = await this.choose();
+    if (this.status !== 'running') return;
     const t0 = this.now();
     let receipt: any;
     try {

@@ -142,6 +142,10 @@ export class TickFeed extends EventEmitter {
     this.timer.unref?.();
   }
 
+  get ready(): boolean {
+    return this.stats.count >= MIN_SAMPLE;
+  }
+
   /** Resolve quando há dígitos suficientes para analisar, ou ao fim do tempo (nunca bloqueia o Play). */
   whenReady(timeoutMs: number): Promise<void> {
     if (this.stats.count >= MIN_SAMPLE) return Promise.resolve();

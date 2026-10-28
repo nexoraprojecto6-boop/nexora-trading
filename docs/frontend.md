@@ -25,7 +25,7 @@ O painel foi reaproveitado do projeto antigo (`frontend-nexora`): **mesma estrut
 `RegisterPage`, `VerifyEmailResultPage`, `VerifyPendingPage`: registo por email (já não existe) e dois ecrãs que chamavam funções que nunca existiram no cliente antigo. Continuam no repositório `frontend-nexora`.
 
 ## Bots (importante)
-O único bot do catálogo é o **Observador**: acompanha o mercado e **não abre operações**. O botão Play só mostra esse estado no painel. O histórico e o gráfico de resultados ficam vazios até existir execução (ver `docs/bots.md`). Os limites de risco são obrigatórios e não têm valor por omissão: um campo vazio nunca é enviado como 0.
+O catálogo tem 6 bots de dígitos (Pares/Ímpares, Over 3, Over 1, Over/Under 3, Under 8, Under 8/Over 7) que operam no servidor; o Play inicia-os e o painel mostra as operações reais. O histórico e o gráfico de resultados ficam vazios até existir execução (ver `docs/bots.md`). Os limites de risco são obrigatórios e não têm valor por omissão: um campo vazio nunca é enviado como 0.
 
 ## Configuração
 - `VITE_API_BASE_URL` (obrigatória): origem https da API, sem barra no fim.

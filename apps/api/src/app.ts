@@ -59,7 +59,7 @@ export async function buildApp(config: ApiConfig, deps: AppDependencies = {}): P
   app.setErrorHandler((error: unknown, request, reply) => {
     if (isAppError(error)) {
       const status = HTTP_STATUS_BY_CODE[error.code];
-      if (status >= 500) {
+      if (status >= 500 && error.code !== "UPSTREAM") {
         request.log.error({ err: error, code: error.code }, "Erro interno da aplicação");
         void reply.status(status).send({ error: { code: error.code, message: "Erro interno do servidor." } });
         return;

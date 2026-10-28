@@ -56,29 +56,6 @@ const DIGIT_RISK: readonly ParamDef[] = [
 
 export const BOT_CATALOG: readonly BotDefinition[] = [
   {
-    id: "observador",
-    name: "Observador (demonstração)",
-    summary: "Acompanha os candles de um símbolo. Não abre operações.",
-    description:
-      "Bot de demonstração para testar a escolha, a configuração e o painel. " +
-      "Acompanha os candles do símbolo escolhido e NÃO abre operações nem usa dinheiro. " +
-      "Não é uma estratégia de trading e não promete qualquer resultado.",
-    params: [
-      { kind: "symbol", key: "symbol", label: "Símbolo", help: "Código do mercado (ex.: R_100).", default: "R_100" },
-      {
-        kind: "select",
-        key: "candleSeconds",
-        label: "Duração do candle",
-        options: [
-          { value: "60", label: "1 minuto" },
-          { value: "120", label: "2 minutos" },
-          { value: "300", label: "5 minutos" },
-        ],
-        default: "60",
-      },
-    ],
-  },
-  {
     id: "even-odd",
     name: "Pares/Ímpares (inteligente)",
     summary: "Escolhe pares ou ímpares conforme a percentagem recente.",

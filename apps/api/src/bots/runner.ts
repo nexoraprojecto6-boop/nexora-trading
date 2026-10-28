@@ -142,8 +142,9 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
     async warmUp({ userId, token, account, symbol }) {
       const entry = ensure(userId, token, account);
       if (!entry.ok) return entry;
-      feedFor(symbol);
-      return connect(entry.value);
+      const feed = feedFor(symbol);
+      const [connected] = await Promise.all([connect(entry.value), feed.whenReady(5000)]);
+      return connected;
     },
 
     async start({ userId, token, account, botId, overrides }) {
@@ -151,8 +152,13 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
       if (!entry.ok) return entry;
       const connected = await connect(entry.value);
       if (!connected.ok) return connected;
-      // Garante os últimos dígitos já carregados (no máx. 1,5 s) para a 1.ª ordem já sair analisada.
-      await feedFor(overrides.symbol ?? "R_100").whenReady(1500);
+      // A 1.ª ordem já tem de sair analisada: espera (no máx. 5 s) pelos últimos dígitos e, num bot
+      // inteligente, não arranca sem eles em vez de entrar às cegas.
+      const feed = feedFor(overrides.symbol ?? "R_100");
+      await feed.whenReady(5000);
+      if (!feed.ready && PRESETS.find((p) => p.id === botId)?.adaptive === true) {
+        return err(new AppError("UPSTREAM", "Sem dados do mercado para analisar. Tente novamente dentro de instantes."));
+      }
       try {
         entry.value.manager.start(botId, overrides);
         return ok(undefined);
