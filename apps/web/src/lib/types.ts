@@ -8,7 +8,7 @@ export type BotStrategyType =
   | 'scalping' | 'martingale' | 'anti_martingale' | 'trend_following'
   | 'scalper' | 'alfha' | 'over1_recovery' | 'even_odd_recovery'
   | 'observador'
-  | 'digit-3' | 'digit-1' | 'over-5' | 'under-8' | 'even' | 'odd'
+  | 'even-odd' | 'over-3' | 'over-1' | 'over3-under3' | 'under-8' | 'under8-over7'
 export type TradeDirection  = 'CALL' | 'PUT'
 export type LogLevel        = 'info' | 'warn' | 'error' | 'trade'
 
@@ -243,7 +243,7 @@ export const STRATEGY_PARAMS_FIELDS: Record<BotStrategyType, StrategyFieldDef[]>
   over1_recovery: [],
   even_odd_recovery: [],
   observador: [],
-  'digit-3': [], 'digit-1': [], 'over-5': [], 'under-8': [], even: [], odd: [],
+  'even-odd': [], 'over-3': [], 'over-1': [], 'over3-under3': [], 'under-8': [], 'under8-over7': [],
 }
 
 export const STRATEGY_LABELS: Record<BotStrategyType, string> = {
@@ -256,10 +256,10 @@ export const STRATEGY_LABELS: Record<BotStrategyType, string> = {
   over1_recovery: 'Over 1 Recovery',
   even_odd_recovery: 'Even/Odd Recovery',
   observador: 'Observador',
-  'digit-3': 'Dígito 3 (Differs)',
-  'digit-1': 'Dígito 1 (Differs)',
-  'over-5': 'Acima de 5 (Over 5)',
+  'even-odd': 'Pares/Ímpares (inteligente)',
+  'over-3': 'Superior a 3 (Over 3)',
+  'over-1': 'Superior a 1 (Over 1)',
+  'over3-under3': 'Superior/Inferior a 3 (inteligente)',
   'under-8': 'Abaixo de 8 (Under 8)',
-  even: 'Pares (Even)',
-  odd: 'Ímpares (Odd)',
+  'under8-over7': 'Abaixo de 8 / Acima de 7 (inteligente)',
 }

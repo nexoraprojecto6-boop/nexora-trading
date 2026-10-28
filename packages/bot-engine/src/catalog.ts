@@ -79,31 +79,45 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
     ],
   },
   {
-    id: "digit-3",
-    name: "Dígito 3 (Differs)",
-    summary: "Aposta que o último dígito NÃO é 3.",
+    id: "even-odd",
+    name: "Pares/Ímpares (inteligente)",
+    summary: "Escolhe pares ou ímpares conforme a percentagem recente.",
     description:
-      "Compra DIGITDIFF com barreira 3. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
+      "ENTRADA: Pares (DIGITEVEN) ou Ímpares (DIGITODD). ANÁLISE: antes de cada ordem compara a percentagem de dígitos pares e ímpares nos últimos 100 ticks (os últimos 20 pesam mais) e entra no lado mais forte. " +
+      "Contratos de 1 tick: a ligação e a análise dos últimos 100 dígitos ficam prontas antes do Play, por isso a primeira ordem sai logo que carrega e a seguinte entra assim que a anterior termina. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
     riskParams: DIGIT_RISK,
   },
   {
-    id: "digit-1",
-    name: "Dígito 1 (Differs)",
-    summary: "Aposta que o último dígito NÃO é 1.",
+    id: "over-3",
+    name: "Superior a 3 (Over 3)",
+    summary: "Aposta que o próximo dígito é maior que 3.",
     description:
-      "Compra DIGITDIFF com barreira 1. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
+      "ENTRADA: DIGITOVER com barreira 3 (ganha se o dígito final for 4 a 9). Sem análise: entra sempre neste contrato. " +
+      "Contratos de 1 tick: a ligação e a análise dos últimos 100 dígitos ficam prontas antes do Play, por isso a primeira ordem sai logo que carrega e a seguinte entra assim que a anterior termina. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
     riskParams: DIGIT_RISK,
   },
   {
-    id: "over-5",
-    name: "Acima de 5 (Over 5)",
-    summary: "Aposta que o último dígito é maior que 5.",
+    id: "over-1",
+    name: "Superior a 1 (Over 1)",
+    summary: "Aposta que o próximo dígito é maior que 1.",
     description:
-      "Compra DIGITOVER com barreira 5. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
+      "ENTRADA: DIGITOVER com barreira 1 (ganha se o dígito final for 2 a 9). Sem análise: entra sempre neste contrato. " +
+      "Contratos de 1 tick: a ligação e a análise dos últimos 100 dígitos ficam prontas antes do Play, por isso a primeira ordem sai logo que carrega e a seguinte entra assim que a anterior termina. " +
+      "Pode perder dinheiro; nenhum bot garante lucro.",
+    params: DIGIT_PARAMS,
+    riskParams: DIGIT_RISK,
+  },
+  {
+    id: "over3-under3",
+    name: "Superior/Inferior a 3 (inteligente)",
+    summary: "Alterna entre acima e abaixo de 3 conforme a percentagem.",
+    description:
+      "ENTRADA: Superior a 3 (dígitos 4 a 9) ou Inferior a 3 (dígitos 0 a 2). ANÁLISE: antes de cada ordem vê qual dos dois lados está mais forte, face ao normal, nos últimos 100 ticks (os últimos 20 pesam mais) e entra nesse. " +
+      "Contratos de 1 tick: a ligação e a análise dos últimos 100 dígitos ficam prontas antes do Play, por isso a primeira ordem sai logo que carrega e a seguinte entra assim que a anterior termina. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
     riskParams: DIGIT_RISK,
@@ -111,29 +125,21 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
   {
     id: "under-8",
     name: "Abaixo de 8 (Under 8)",
-    summary: "Aposta que o último dígito é menor que 8.",
+    summary: "Aposta que o próximo dígito é menor que 8.",
     description:
-      "Compra DIGITUNDER com barreira 8. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
+      "ENTRADA: DIGITUNDER com barreira 8 (ganha se o dígito final for 0 a 7). Sem análise: entra sempre neste contrato. " +
+      "Contratos de 1 tick: a ligação e a análise dos últimos 100 dígitos ficam prontas antes do Play, por isso a primeira ordem sai logo que carrega e a seguinte entra assim que a anterior termina. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
     riskParams: DIGIT_RISK,
   },
   {
-    id: "even",
-    name: "Pares (Even)",
-    summary: "Aposta que o último dígito é par.",
+    id: "under8-over7",
+    name: "Abaixo de 8 / Acima de 7 (inteligente)",
+    summary: "Alterna entre abaixo de 8 e acima de 7 conforme a percentagem.",
     description:
-      "Compra DIGITEVEN. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
-      "Pode perder dinheiro; nenhum bot garante lucro.",
-    params: DIGIT_PARAMS,
-    riskParams: DIGIT_RISK,
-  },
-  {
-    id: "odd",
-    name: "Ímpares (Odd)",
-    summary: "Aposta que o último dígito é ímpar.",
-    description:
-      "Compra DIGITODD. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
+      "ENTRADA: Abaixo de 8 (dígitos 0 a 7) ou Acima de 7 (dígitos 8 e 9). ANÁLISE: antes de cada ordem vê qual dos dois lados está mais forte, face ao normal, nos últimos 100 ticks (os últimos 20 pesam mais) e entra nesse. " +
+      "Contratos de 1 tick: a ligação e a análise dos últimos 100 dígitos ficam prontas antes do Play, por isso a primeira ordem sai logo que carrega e a seguinte entra assim que a anterior termina. " +
       "Pode perder dinheiro; nenhum bot garante lucro.",
     params: DIGIT_PARAMS,
     riskParams: DIGIT_RISK,

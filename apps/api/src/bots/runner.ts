@@ -1,5 +1,5 @@
 import { AppError, err, ok, type Result } from "@nexora/shared";
-import { BotManager, DerivSession, PRESETS, type BotConfig, type BotStats, type TradeRecord } from "../digit-bots/index.js";
+import { BotManager, DerivSession, PRESETS, TickFeed, type BotConfig, type BotStats, type TradeRecord } from "../digit-bots/index.js";
 
 export interface RunnerAccount {
   readonly accountId: string;
@@ -27,7 +27,7 @@ export interface BotRunner {
   /** Ids dos bots que realmente operam. */
   isRunnable(botId: string): boolean;
   /** Abre a ligação à Deriv antes do Play, para a primeira ordem sair sem esperar. */
-  warmUp(input: { userId: string; token: string; account: RunnerAccount }): Promise<Result<void>>;
+  warmUp(input: { userId: string; token: string; account: RunnerAccount; symbol: string }): Promise<Result<void>>;
   start(input: { userId: string; token: string; account: RunnerAccount; botId: string; overrides: Partial<BotConfig> }): Promise<Result<void>>;
   stop(userId: string, botId: string): Promise<void>;
   state(userId: string): LiveState;
@@ -68,8 +68,28 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
     entry.session.close();
   }
 
+  // Ticks públicos por símbolo, partilhados por todos os utilizadores (alimentam a análise dos bots).
+  const feeds = new Map<string, { feed: TickFeed; lastUsed: number }>();
+  function feedFor(symbol: string): TickFeed {
+    let held = feeds.get(symbol);
+    if (held === undefined) {
+      const feed = new TickFeed(symbol);
+      feed.start();
+      held = { feed, lastUsed: Date.now() };
+      feeds.set(symbol, held);
+    }
+    held.lastUsed = Date.now();
+    return held.feed;
+  }
+
   const sweeper = setInterval(() => {
     const now = Date.now();
+    for (const [symbol, held] of feeds) {
+      if (now - held.lastUsed > IDLE_MS) {
+        held.feed.stop();
+        feeds.delete(symbol);
+      }
+    }
     for (const [userId, entry] of entries) {
       if (!isBusy(entry) && now - entry.lastUsed > IDLE_MS) dispose(userId);
     }
@@ -88,7 +108,7 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
     }
     if (entry === undefined) {
       const session = new DerivSession({ token, accountId: account.accountId, accountType: account.accountType, log });
-      const manager = new BotManager({ session, log });
+      const manager = new BotManager({ session, log, feeds: (symbol) => feedFor(symbol).stats });
       const created: Entry = { session, manager, accountId: account.accountId, token, trades: [], totals: {}, lastUsed: Date.now() };
       manager.on("trade", (trade: TradeRecord) => {
         created.trades.unshift(trade);
@@ -119,9 +139,10 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
   return {
     isRunnable: (botId) => PRESETS.some((preset) => preset.id === botId),
 
-    async warmUp({ userId, token, account }) {
+    async warmUp({ userId, token, account, symbol }) {
       const entry = ensure(userId, token, account);
       if (!entry.ok) return entry;
+      feedFor(symbol);
       return connect(entry.value);
     },
 
@@ -130,6 +151,8 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
       if (!entry.ok) return entry;
       const connected = await connect(entry.value);
       if (!connected.ok) return connected;
+      // Garante os últimos dígitos já carregados (no máx. 1,5 s) para a 1.ª ordem já sair analisada.
+      await feedFor(overrides.symbol ?? "R_100").whenReady(1500);
       try {
         entry.value.manager.start(botId, overrides);
         return ok(undefined);
@@ -159,6 +182,8 @@ export function createBotRunner(options: BotRunnerOptions): BotRunner {
 
     async close() {
       clearInterval(sweeper);
+      for (const held of feeds.values()) held.feed.stop();
+      feeds.clear();
       for (const userId of [...entries.keys()]) dispose(userId);
     },
   };

@@ -6,3 +6,4 @@ export * from './session.js';
 export * from './presets.js';
 export * from './bot.js';
 export * from './manager.js';
+export * from './feed.js';

@@ -6,12 +6,18 @@ export type DigitContractType =
   | 'DIGITEVEN'
   | 'DIGITODD';
 
-export interface BotConfig {
-  id: string;
-  label: string;
+export interface DigitOption {
   contractType: DigitContractType;
   /** Dígito de previsão (0-9). Obrigatório em OVER/UNDER/MATCH/DIFF; ignorado em EVEN/ODD. */
   barrier?: number;
+}
+
+export interface BotConfig {
+  id: string;
+  label: string;
+  /** Opções em que o bot pode entrar. Com `adaptive`, escolhe a mais forte antes de cada ordem. */
+  options: DigitOption[];
+  adaptive: boolean;
   symbol: string;
   /** Stake base por operação. */
   stake: number;
@@ -58,6 +64,8 @@ export interface TradeRecord {
   balanceAfter: number | null;
   /** Tick de saída (texto exato), quando a Deriv o devolve. */
   exitSpot?: string;
+  /** Percentagem recente (últimos 100 ticks) da opção escolhida, quando havia análise. */
+  pickPct?: number;
   at: number;
 }
 

@@ -151,7 +151,10 @@ export function registerBotRoutes(app: FastifyInstance, deps: BotRouteDeps): voi
     const ctx = await requireRunner(request, reply);
     if (ctx === undefined) return reply;
     const { account, token } = await resolveAccount(ctx, request.body.accountId);
-    const result = await ctx.runner.warmUp({ userId: ctx.user.userId, token, account });
+    const saved = await ctx.bots.getUserState(ctx.user.userId);
+    const savedSymbol = saved.ok ? saved.value.config?.params["symbol"] : undefined;
+    const symbol = typeof savedSymbol === "string" ? savedSymbol : "R_100";
+    const result = await ctx.runner.warmUp({ userId: ctx.user.userId, token, account, symbol });
     if (!result.ok) throw result.error;
     return reply.status(204).send();
   });

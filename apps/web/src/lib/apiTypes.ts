@@ -183,6 +183,7 @@ export interface LiveTrade {
   won: boolean
   latencyMs: number
   exitSpot?: string
+  pickPct?: number
   at: number
 }
 

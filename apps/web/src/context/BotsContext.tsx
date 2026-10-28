@@ -4,7 +4,7 @@
 // Mesma interface que os componentes do painel já usavam, mas ligada ao servidor
 // novo: o catálogo, a escolha e a configuração vêm da API.
 //
-// Os bots de dígitos (digit-3, digit-1, over-5, under-8, even, odd) operam no servidor.
+// Os bots de dígitos (even-odd, over-3, over-1, over3-under3, under-8, under8-over7) operam no servidor.
 // O Observador só acompanha o mercado. Compra manual e administração seguem indisponíveis.
 // ============================================================
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react'
@@ -110,7 +110,7 @@ const ZERO_STATS = {
   winRate: 0, currentStreak: 0, currentStake: 0, peakProfit: 0, maxDrawdown: 0,
 }
 /** Bots que operam de verdade no servidor (os restantes só acompanham o mercado). */
-const RUNNABLE = new Set(['digit-3', 'digit-1', 'over-5', 'under-8', 'even', 'odd'])
+const RUNNABLE = new Set(['even-odd', 'over-3', 'over-1', 'over3-under3', 'under-8', 'under8-over7'])
 const LIVE_POLL_MS = 400
 const STOP_TEXT: Record<string, string> = {
   stop_loss: 'Atingiu a perda máxima definida.',
@@ -294,7 +294,7 @@ export function BotsProvider({ children }: { children: ReactNode }) {
       profit: t.profit,
       won: t.won,
       timestamp: t.at,
-      direction: t.barrier !== undefined ? `${t.contractType.replace('DIGIT', '')} ${t.barrier}` : t.contractType.replace('DIGIT', ''),
+      direction: `${t.contractType.replace('DIGIT', '')}${t.barrier !== undefined ? ` ${t.barrier}` : ''}${t.pickPct !== undefined ? ` · ${t.pickPct}%` : ''}`,
       contractType: t.contractType,
       ...(t.exitSpot !== undefined ? { exitSpot: t.exitSpot, exitDigit: Number(t.exitSpot.slice(-1)) } : {}),
     })))

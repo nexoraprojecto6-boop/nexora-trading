@@ -1,8 +1,10 @@
 import { DerivApiError } from './errors.js';
+import { expectedShare, MIN_SAMPLE, optionPredicate, type DigitStats } from './feed.js';
 import type {
   BotConfig,
   BotStats,
   BotStatus,
+  DigitOption,
   Limiter,
   OpenContract,
   StopReason,
@@ -16,6 +18,8 @@ export interface BotDeps {
   onTrade?: (t: TradeRecord) => void;
   onStop?: (stats: BotStats) => void;
   log?: (msg: string) => void;
+  /** Dígitos recentes do símbolo do bot (já em memória: a análise é instantânea). */
+  stats?: () => DigitStats | undefined;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
   /** Tempo máximo à espera da liquidação de um contrato de 1 tick. */
@@ -145,27 +149,48 @@ export class DigitBot {
     }
   }
 
-  private buyMessage(): Record<string, unknown> {
+  /** Escolhe a opção da próxima ordem. Sem análise disponível, entra logo na primeira (nunca espera). */
+  private choose(): { option: DigitOption; pct: number | null } {
+    const first = this.config.options[0]!;
+    const stats = this.deps.stats?.();
+    if (!stats || stats.count < MIN_SAMPLE) return { option: first, pct: null };
+    const candidates = this.config.adaptive ? this.config.options : [first];
+    let best = first;
+    let bestScore = -Infinity;
+    for (const o of candidates) {
+      const pred = optionPredicate(o);
+      // Força relativa: quanto o lado está acima do normal (últimos 20 ticks pesam mais que os 100).
+      const score = (0.6 * stats.share(pred, 20) + 0.4 * stats.share(pred)) / expectedShare(o);
+      if (score > bestScore) {
+        best = o;
+        bestScore = score;
+      }
+    }
+    return { option: best, pct: Math.round(stats.share(optionPredicate(best)) * 100) };
+  }
+
+  private buyMessage(option: DigitOption): Record<string, unknown> {
     const c = this.config;
     const parameters: Record<string, unknown> = {
       amount: this.stake,
       basis: 'stake',
-      contract_type: c.contractType,
+      contract_type: option.contractType,
       currency: this.deps.session.currency,
       duration: 1,
       duration_unit: 't',
       underlying_symbol: c.symbol,
     };
-    if (c.barrier !== undefined) parameters.barrier = String(c.barrier);
+    if (option.barrier !== undefined) parameters.barrier = String(option.barrier);
     return { buy: 1, price: this.stake, subscribe: 1, parameters };
   }
 
   private async tradeOnce(): Promise<void> {
     const stake = this.stake;
+    const pick = this.choose();
     const t0 = this.now();
     let receipt: any;
     try {
-      const res = await this.deps.session.request(this.buyMessage());
+      const res = await this.deps.session.request(this.buyMessage(pick.option));
       receipt = res.buy;
       if (!receipt) throw new Error('Resposta de compra sem recibo');
       this.consecutiveErrors = 0;
@@ -212,8 +237,9 @@ export class DigitBot {
     const record: TradeRecord = {
       botId: this.config.id,
       contractId: receipt.contract_id,
-      contractType: this.config.contractType,
-      barrier: this.config.barrier,
+      contractType: pick.option.contractType,
+      ...(pick.option.barrier !== undefined ? { barrier: pick.option.barrier } : {}),
+      ...(pick.pct !== null ? { pickPct: pick.pct } : {}),
       stake,
       payout: num(receipt.payout),
       profit: round2(profit),
