@@ -1,0 +1,15 @@
+NEXORA DIGIT BOTS — como aplicar no repositório nexora-trading
+
+1) Copie para a raiz do repositório (mantendo as pastas):
+   - packages/digit-bots/            (pacote novo com os 6 bots)
+   - pnpm-lock.yaml                  (substitui o da raiz; só acrescenta packages/digit-bots)
+   - .github/workflows/fix-lockfile.yml   (opcional: regenera o lockfile se algo ficar fora de sincronia)
+
+2) Confirme que pnpm-workspace.yaml inclui "packages/*".
+
+3) Leia packages/digit-bots/README.md (uso, risco, CLI) e docs/INTEGRACAO.md (rotas Fastify).
+
+4) Comece SEMPRE em conta demo (DERIV_ACCOUNT_TYPE=demo).
+
+O pnpm-lock.yaml incluído parte do lockfile atual da main, com @nexora/bot-engine em apps/api.
+Se o seu apps/api/package.json mudou desde então, use o workflow fix-lockfile.yml.
