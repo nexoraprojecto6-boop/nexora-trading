@@ -25,6 +25,8 @@ export interface AuthService {
   logout(token: string): Promise<Result<void>>;
   /** Contas com saldo atual (via Deriv). Sem token válido, devolve as contas guardadas, sem saldo. */
   getAccountsView(userId: string): Promise<Result<AccountsView>>;
+  /** Token Deriv do utilizador (decifrado, só para uso no servidor). `ok(null)` se não existe ou expirou. */
+  getDerivAccessToken(userId: string): Promise<Result<string | null>>;
   /** Número de sessões ativas nos últimos 5 minutos. */
   countOnline(): Promise<Result<number>>;
 }
@@ -255,6 +257,21 @@ export function createAuthService({ pool, deriv, config }: AuthServiceDeps): Aut
         // Só devolve contas que pertencem a este utilizador (nunca contas de outro).
         const owned = new Set(stored.map((account) => account.accountId));
         return ok({ accounts: live.value.filter((account) => owned.has(account.accountId)), live: true });
+      } catch (cause) {
+        return err(new AppError("INTERNAL", DB_FAILED, { cause }));
+      }
+    },
+
+    async getDerivAccessToken(userId) {
+      try {
+        const row = await pool.query<{ access_token_enc: string; valid: boolean }>(
+          "select access_token_enc, (access_expires_at is null or access_expires_at > now()) as valid from deriv_credentials where user_id = $1",
+          [userId],
+        );
+        const credentials = row.rows[0];
+        if (credentials === undefined || !credentials.valid) return ok(null);
+        const token = decryptSecret(key, credentials.access_token_enc, `deriv_token:${userId}`);
+        return ok(token.ok ? token.value : null);
       } catch (cause) {
         return err(new AppError("INTERNAL", DB_FAILED, { cause }));
       }

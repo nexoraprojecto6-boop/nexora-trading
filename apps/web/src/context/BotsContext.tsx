@@ -4,15 +4,13 @@
 // Mesma interface que os componentes do painel já usavam, mas ligada ao servidor
 // novo: o catálogo, a escolha e a configuração vêm da API.
 //
-// IMPORTANTE: o servidor ainda NÃO executa operações. O único bot do catálogo
-// ("Observador") só acompanha o mercado e não abre operações; o "Play" apenas
-// mostra esse estado no painel. Compra manual, histórico real e comandos de
-// administração ficam desligados até existir servidor.
+// Os bots de dígitos (digit-3, digit-1, over-5, under-8, even, odd) operam no servidor.
+// O Observador só acompanha o mercado. Compra manual e administração seguem indisponíveis.
 // ============================================================
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react'
 import type { BotSummary, BotState, BotLogEntry, BotConfig, BotStrategyType, CatalogBot, WsStatus } from '../lib/types'
 import type { ManualBuyParams } from '../hooks/useNexoraWs'
-import { api, HttpError, type BotSettingsValues } from '../lib/api'
+import { api, HttpError, type BotSettingsValues, type LiveBots } from '../lib/api'
 import { toCatalogBot } from '../lib/mappers'
 import { useAuth } from './AuthContext'
 import { useTrading } from './TradingContext'
@@ -111,6 +109,17 @@ const ZERO_STATS = {
   totalTrades: 0, wins: 0, losses: 0, totalProfit: 0, totalLoss: 0, netPnL: 0,
   winRate: 0, currentStreak: 0, currentStake: 0, peakProfit: 0, maxDrawdown: 0,
 }
+/** Bots que operam de verdade no servidor (os restantes só acompanham o mercado). */
+const RUNNABLE = new Set(['digit-3', 'digit-1', 'over-5', 'under-8', 'even', 'odd'])
+const LIVE_POLL_MS = 1000
+const STOP_TEXT: Record<string, string> = {
+  stop_loss: 'Atingiu a perda máxima definida.',
+  take_profit: 'Atingiu o lucro definido.',
+  max_consecutive_losses: 'Atingiu o limite de perdas seguidas.',
+  max_trades: 'Atingiu o limite de operações.',
+  insufficient_balance: 'Saldo insuficiente.',
+  error: 'Parou por erro. Veja o histórico da conta.',
+}
 const UNAVAILABLE = 'Esta funcionalidade ainda não está disponível.'
 
 export function BotsProvider({ children }: { children: ReactNode }) {
@@ -127,6 +136,7 @@ export function BotsProvider({ children }: { children: ReactNode }) {
   const [manualBuyError, setManualBuyError] = useState<string | null>(null)
   const [trades, setTrades] = useState<TradeRecord[]>([])
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevStatus = useRef<Record<string, string>>({})
 
   const notify = useCallback((msg: StatusMessage) => {
     setStatusMessage(msg)
@@ -212,18 +222,108 @@ export function BotsProvider({ children }: { children: ReactNode }) {
       return false
     }
     const id = `local-${catalogBotId}`
+    if (RUNNABLE.has(catalogBotId)) {
+      if (!currentAccount) {
+        notify({ kind: 'error', title: 'Sem conta', text: 'Escolha uma conta Deriv antes de iniciar.' })
+        return false
+      }
+      setTrades(prev => prev.filter(t => t.botId !== catalogBotId))
+      setSessionBots(prev => [
+        ...prev.filter(b => b.id !== id),
+        { id, name: sessionName ?? bot.name, strategy: bot.strategy, status: 'running', stats: { ...ZERO_STATS }, startedAt: new Date().toISOString() },
+      ])
+      api.startBotRun(catalogBotId, currentAccount.account_id).catch((e: unknown) => {
+        setSessionBots(prev => prev.filter(b => b.id !== id))
+        notify({ kind: 'error', title: 'Não foi possível iniciar', text: e instanceof HttpError ? e.message : 'Tente novamente.' })
+      })
+      return true
+    }
     setSessionBots(prev => [
       ...prev.filter(b => b.id !== id),
       { id, name: sessionName ?? bot.name, strategy: bot.strategy, status: 'running', stats: { ...ZERO_STATS }, startedAt: new Date().toISOString() },
     ])
     notify({ kind: 'info', title: `${bot.name} ativo`, text: 'Acompanha o mercado e não abre operações.' })
     return true
-  }, [catalogBots, selectedBotId, savedConfig, derivLive, notify])
+  }, [catalogBots, selectedBotId, savedConfig, derivLive, currentAccount, notify])
 
-  const stopBot = useCallback((id: string) => patchBot(id, 'stopped'), [patchBot])
-  const pauseBot = useCallback((id: string) => patchBot(id, 'paused'), [patchBot])
+  const stopBot = useCallback((id: string) => {
+    const botId = id.replace(/^local-/, '')
+    patchBot(id, 'stopped')
+    if (RUNNABLE.has(botId)) void api.stopBotRun(botId).catch(() => undefined)
+  }, [patchBot])
+  const pauseBot = useCallback((id: string) => {
+    if (RUNNABLE.has(id.replace(/^local-/, ''))) { stopBot(id); return }
+    patchBot(id, 'paused')
+  }, [patchBot, stopBot])
   const resumeBot = useCallback((id: string) => patchBot(id, 'running'), [patchBot])
   const deleteBot = useCallback((id: string) => setSessionBots(prev => prev.filter(b => b.id !== id)), [])
+
+  // ── Pré-aquecimento: abre a ligação à Deriv antes do Play, para a 1.ª ordem sair sem esperar ──
+  const accountId = currentAccount?.account_id
+  useEffect(() => {
+    if (!isAuthenticated || !derivLive || !accountId || !selectedBotId || !RUNNABLE.has(selectedBotId)) return
+    void api.warmUpBots(accountId).catch(() => undefined)
+  }, [isAuthenticated, derivLive, accountId, selectedBotId])
+
+  // ── Estado em tempo real dos bots que operam (consulta a cada segundo enquanto algum corre) ──
+  const applyLive = useCallback((live: LiveBots) => {
+    const nameOf = (botId: string) => catalogBots.find(b => b.id === botId)?.name ?? botId
+    setTrades(live.trades.map(t => ({
+      id: String(t.contractId),
+      hora: new Date(t.at).toLocaleTimeString('pt-PT', { hour12: false }),
+      botId: t.botId,
+      botName: nameOf(t.botId),
+      strategy: t.botId,
+      stake: t.stake,
+      profit: t.profit,
+      won: t.won,
+      timestamp: t.at,
+      direction: t.barrier !== undefined ? `${t.contractType.replace('DIGIT', '')} ${t.barrier}` : t.contractType.replace('DIGIT', ''),
+      contractType: t.contractType,
+      ...(t.exitSpot !== undefined ? { exitSpot: t.exitSpot, exitDigit: Number(t.exitSpot.slice(-1)) } : {}),
+    })))
+    setSessionBots(prev => prev.map((b): BotSummary => {
+      const botId = b.id.replace(/^local-/, '')
+      const st = live.bots.find(x => x.botId === botId)
+      if (!st || !RUNNABLE.has(botId)) return b
+      // Enquanto o servidor ainda não registou o arranque, mantém o estado local (evita piscar).
+      if (st.status === 'idle') return b
+      const mine = live.trades.filter(t => t.botId === botId)
+      const totalProfit = mine.reduce((a, t) => a + (t.profit > 0 ? t.profit : 0), 0)
+      const totalLoss = mine.reduce((a, t) => a + (t.profit < 0 ? -t.profit : 0), 0)
+      return {
+        ...b,
+        status: st.status === 'running' ? 'running' : 'stopped',
+        stats: {
+          ...b.stats,
+          totalTrades: st.trades, wins: st.wins, losses: st.losses, winRate: st.winRate * 100,
+          netPnL: st.profit, totalProfit, totalLoss, currentStake: st.currentStake, currentStreak: st.consecutiveLosses,
+        },
+      }
+    }))
+    for (const st of live.bots) {
+      const before = prevStatus.current[st.botId]
+      prevStatus.current[st.botId] = st.status
+      if (before === 'running' && st.status === 'stopped' && st.stopReason && st.stopReason !== 'manual') {
+        notify({ kind: st.stopReason === 'take_profit' ? 'success' : 'warning', title: `${nameOf(st.botId)} parou`, text: STOP_TEXT[st.stopReason] ?? st.lastError ?? 'O bot parou.' })
+      }
+    }
+  }, [catalogBots, notify])
+
+  const anyRunning = sessionBots.some(b => b.status === 'running' && RUNNABLE.has(b.id.replace(/^local-/, '')))
+  useEffect(() => {
+    if (!isAuthenticated || !anyRunning) return
+    let cancelled = false
+    const tick = async () => {
+      try {
+        const live = await api.getBotsLive()
+        if (!cancelled) applyLive(live)
+      } catch { /* falha pontual: tenta no próximo segundo */ }
+    }
+    void tick()
+    const timer = setInterval(() => { void tick() }, LIVE_POLL_MS)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [isAuthenticated, anyRunning, applyLive])
 
   const unavailable = useCallback(() => notify({ kind: 'info', title: 'Indisponível', text: UNAVAILABLE }), [notify])
   const manualBuy = useCallback((_params: ManualBuyParams) => {

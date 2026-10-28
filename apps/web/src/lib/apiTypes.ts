@@ -153,6 +153,41 @@ export interface MyBotState {
   config: BotSettingsValues | null
 }
 
+export interface LiveBotStats {
+  botId: string
+  label: string
+  status: 'idle' | 'running' | 'stopped'
+  stopReason?: string
+  lastError?: string
+  trades: number
+  wins: number
+  losses: number
+  winRate: number
+  profit: number
+  consecutiveLosses: number
+  currentStake: number
+}
+
+export interface LiveTrade {
+  botId: string
+  contractId: number
+  contractType: string
+  barrier?: number
+  stake: number
+  payout: number
+  profit: number
+  won: boolean
+  latencyMs: number
+  exitSpot?: string
+  at: number
+}
+
+export interface LiveBots {
+  accountId: string | null
+  bots: LiveBotStats[]
+  trades: LiveTrade[]
+}
+
 // ── Núcleo ──────────────────────────────────────────────────
 
 function isRecord(v: unknown): v is Record<string, unknown> {

@@ -5,6 +5,7 @@ import type { ApiConfig } from "./config.js";
 import { HTTP_STATUS_BY_CODE, codeForClientStatus } from "./http-errors.js";
 import type { AuthService } from "./auth/service.js";
 import type { BotService } from "./bots/service.js";
+import type { BotRunner } from "./bots/runner.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerBotRoutes } from "./routes/bots.js";
 import { registerHealthRoutes } from "./routes/health.js";
@@ -17,6 +18,8 @@ export interface AppDependencies {
   readonly auth?: AuthService;
   /** Catálogo e configuração de bots. Sem ele, as rotas de bots respondem 503. */
   readonly bots?: BotService;
+  /** Executa os bots de dígitos. Sem ele, o início de bots responde 503. */
+  readonly runner?: BotRunner;
 }
 
 export async function buildApp(config: ApiConfig, deps: AppDependencies = {}): Promise<FastifyInstance> {
@@ -80,7 +83,9 @@ export async function buildApp(config: ApiConfig, deps: AppDependencies = {}): P
   registerHealthRoutes(app);
   registerReadyRoutes(app, deps.database);
   registerAuthRoutes(app, { service: deps.auth, config: config.auth });
-  registerBotRoutes(app, { auth: deps.auth, authConfig: config.auth, bots: deps.bots });
+  registerBotRoutes(app, { auth: deps.auth, authConfig: config.auth, bots: deps.bots, runner: deps.runner });
+  const runner = deps.runner;
+  if (runner !== undefined) app.addHook("onClose", async () => runner.close());
   const database = deps.database;
   if (database !== undefined) app.addHook("onClose", async () => database.close());
   return app;

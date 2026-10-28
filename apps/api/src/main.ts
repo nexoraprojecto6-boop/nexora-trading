@@ -3,6 +3,7 @@ import { loadConfig } from "./config.js";
 import { createDerivAuthClient } from "@nexora/deriv-client";
 import { createAuthService } from "./auth/service.js";
 import { createBotService } from "./bots/service.js";
+import { createBotRunner } from "./bots/runner.js";
 import { createDatabase } from "./db/pool.js";
 
 const configResult = loadConfig(process.env);
@@ -21,10 +22,15 @@ const auth =
   config.auth !== undefined && database !== undefined
     ? createAuthService({ pool: database.pool, deriv: createDerivAuthClient(), config: config.auth })
     : undefined;
+const runner =
+  auth !== undefined
+    ? createBotRunner({ allowReal: process.env["DERIV_ALLOW_REAL"] === "yes", log: (message) => app.log.info(message) })
+    : undefined;
 const app = await buildApp(config, {
   ...(database !== undefined ? { database } : {}),
   ...(auth !== undefined ? { auth } : {}),
   ...(database !== undefined ? { bots: createBotService(database.pool) } : {}),
+  ...(runner !== undefined ? { runner } : {}),
 });
 if (config.nodeEnv === "production" && config.database?.ssl === "disable") {
   app.log.warn("A ligação à base de dados em produção não usa TLS (DATABASE_SSL=disable).");

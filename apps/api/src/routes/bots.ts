@@ -4,11 +4,14 @@ import { cookieNames, parseCookies } from "../auth/cookies.js";
 import type { AuthConfig } from "../auth/config.js";
 import type { AuthService, SessionUser } from "../auth/service.js";
 import type { BotService } from "../bots/service.js";
+import type { BotRunner } from "../bots/runner.js";
+import { AppError } from "@nexora/shared";
 
 export interface BotRouteDeps {
   readonly auth: AuthService | undefined;
   readonly authConfig: AuthConfig | undefined;
   readonly bots: BotService | undefined;
+  readonly runner?: BotRunner | undefined;
 }
 
 const botIdParams = {
@@ -24,6 +27,13 @@ const selectionBody = {
   properties: { botId: { type: "string", minLength: 1, maxLength: 40 } },
 } as const;
 
+const accountBody = {
+  type: "object",
+  required: ["accountId"],
+  additionalProperties: false,
+  properties: { accountId: { type: "string", minLength: 1, maxLength: 40 } },
+} as const;
+
 const configBody = {
   type: "object",
   required: ["botId", "risk"],
@@ -36,7 +46,7 @@ const configBody = {
 } as const;
 
 export function registerBotRoutes(app: FastifyInstance, deps: BotRouteDeps): void {
-  const { auth, authConfig, bots } = deps;
+  const { auth, authConfig, bots, runner } = deps;
 
   /** Devolve o utilizador autenticado ou responde ao pedido (401/503) e devolve undefined. */
   async function requireUser(request: FastifyRequest, reply: FastifyReply): Promise<SessionUser | undefined> {
@@ -106,4 +116,91 @@ export function registerBotRoutes(app: FastifyInstance, deps: BotRouteDeps): voi
       return { config: result.value };
     },
   );
+
+  // ── Execução dos bots (por utilizador) ──────────────────────────────────
+
+  /** Utilizador + serviços necessários para operar; responde 503 se o servidor não estiver preparado. */
+  async function requireRunner(request: FastifyRequest, reply: FastifyReply) {
+    const user = await requireUser(request, reply);
+    if (user === undefined) return undefined;
+    if (auth === undefined || bots === undefined || runner === undefined) {
+      await reply.status(503).send({ error: { code: "CONFIG", message: "Execução de bots não configurada neste ambiente." } });
+      return undefined;
+    }
+    return { user, auth, bots, runner };
+  }
+
+  /** Conta do utilizador (nunca de outro) e o respetivo token Deriv. */
+  async function resolveAccount(ctx: NonNullable<Awaited<ReturnType<typeof requireRunner>>>, accountId: string) {
+    const account = ctx.user.accounts.find((a) => a.accountId === accountId && a.status === "active");
+    if (account === undefined) throw new AppError("NOT_FOUND", "Conta não encontrada.");
+    const token = await ctx.auth.getDerivAccessToken(ctx.user.userId);
+    if (!token.ok) throw token.error;
+    if (token.value === null) throw new AppError("FORBIDDEN", "Ligação à Deriv expirada. Termine a sessão e entre de novo.");
+    return { account: { accountId: account.accountId, accountType: account.accountType }, token: token.value };
+  }
+
+  app.get("/me/bots/live", async (request, reply) => {
+    const ctx = await requireRunner(request, reply);
+    if (ctx === undefined) return reply;
+    return ctx.runner.state(ctx.user.userId);
+  });
+
+  app.post<{ Body: { accountId: string } }>("/me/bots/warmup", { schema: { body: accountBody } }, async (request, reply) => {
+    if (!(await requireWebOrigin(request, reply))) return reply;
+    const ctx = await requireRunner(request, reply);
+    if (ctx === undefined) return reply;
+    const { account, token } = await resolveAccount(ctx, request.body.accountId);
+    const result = await ctx.runner.warmUp({ userId: ctx.user.userId, token, account });
+    if (!result.ok) throw result.error;
+    return reply.status(204).send();
+  });
+
+  app.post<{ Params: { id: string }; Body: { accountId: string } }>(
+    "/me/bots/:id/start",
+    { schema: { params: botIdParams, body: accountBody } },
+    async (request, reply) => {
+      if (!(await requireWebOrigin(request, reply))) return reply;
+      const ctx = await requireRunner(request, reply);
+      if (ctx === undefined) return reply;
+      const botId = request.params.id;
+      if (!ctx.runner.isRunnable(botId)) throw new AppError("VALIDATION", "Este bot não abre operações.");
+
+      const state = await ctx.bots.getUserState(ctx.user.userId);
+      if (!state.ok) throw state.error;
+      const { selectedBotId, config } = state.value;
+      if (selectedBotId !== botId || config === null) {
+        throw new AppError("VALIDATION", "Guarde as configurações deste bot antes de iniciar.");
+      }
+
+      const { account, token } = await resolveAccount(ctx, request.body.accountId);
+      const risk = config.risk;
+      const result = await ctx.runner.start({
+        userId: ctx.user.userId,
+        token,
+        account,
+        botId,
+        overrides: {
+          symbol: String(config.params["symbol"] ?? "R_100"),
+          stake: Number(risk["stake"]),
+          stopLoss: Number(risk["maxDailyLoss"]),
+          takeProfit: 0,
+          maxConsecutiveLosses: Number(risk["maxConsecutiveLosses"]),
+          maxTrades: Number(risk["maxTradesPerDay"]),
+          cooldownMs: Number(risk["cooldownSeconds"]) * 1000,
+          stakeMultiplierOnLoss: 1,
+        },
+      });
+      if (!result.ok) throw result.error;
+      return reply.status(204).send();
+    },
+  );
+
+  app.post<{ Params: { id: string } }>("/me/bots/:id/stop", { schema: { params: botIdParams } }, async (request, reply) => {
+    if (!(await requireWebOrigin(request, reply))) return reply;
+    const ctx = await requireRunner(request, reply);
+    if (ctx === undefined) return reply;
+    await ctx.runner.stop(ctx.user.userId, request.params.id);
+    return reply.status(204).send();
+  });
 }

@@ -40,3 +40,15 @@ Decisões a tomar **antes** de escrever o executor:
 8. **Alojamento.** No Render, um *background worker* é um serviço pago e deve correr em **uma só instância**.
 9. **Estratégias.** Escolher e validar (backtest e depois demo) fora deste repositório de infraestrutura, antes de qualquer uso real.
 10. **Controlo pelo utilizador.** Botão de paragem imediata e notificação quando o robô pára.
+
+
+## Bots de dígitos (execução no servidor)
+
+Código em `apps/api/src/digit-bots` (ligação Deriv, bots e gestor) e `apps/api/src/bots/runner.ts` (um gestor por utilizador, com o token Deriv dele).
+
+- Bots: `digit-3` e `digit-1` (Differs), `over-5`, `under-8`, `even`, `odd`. Contratos de 1 tick, `buy` direto com `parameters` (sem `proposal`), `underlying_symbol`.
+- Entrada rápida: ao escolher o bot, o frontend chama `POST /me/bots/warmup` e a ligação fica aberta; o Play só envia `buy`.
+- Rotas (cookie de sessão + origem do frontend): `GET /me/bots/live`, `POST /me/bots/warmup`, `POST /me/bots/:id/start`, `POST /me/bots/:id/stop`.
+- Limites vêm da configuração guardada: valor por operação, perda máxima (pára), perdas seguidas, operações e espera.
+- Conta real só com `DERIV_ALLOW_REAL=yes` no servidor. Por omissão só demo.
+- Uma só instância da API (o estado dos bots vive em memória).

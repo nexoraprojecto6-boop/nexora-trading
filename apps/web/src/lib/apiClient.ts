@@ -8,7 +8,7 @@ import { DEFAULT_ACCOUNT_LABELS } from './config'
 import {
   FeatureUnavailableError, HttpError, toAccount, toHttpError,
   type AdminNotification, type AdminStats, type AdminUserRow, type ApiAccount, type ApiBotDefinition, type ApiParamDef,
-  type BotSettingsValues, type CreateNotificationPayload, type MarkupStatisticsData, type MarkupStatisticsParams, type MyBotState,
+  type BotSettingsValues, type CreateNotificationPayload, type LiveBots, type MarkupStatisticsData, type MarkupStatisticsParams, type MyBotState,
 } from './apiTypes'
 import type { Account, AccountLabels } from './types'
 
@@ -75,6 +75,20 @@ export function createApi(base: string | undefined, fetchFn: typeof fetch = (...
     },
     async saveBotConfig(botId: string, values: BotSettingsValues): Promise<{ config: BotSettingsValues }> {
       return request('/me/bot/config', { method: 'PUT', body: { botId, params: values.params, risk: values.risk } })
+    },
+
+    // ── Execução ────────────────────────────────────────────────
+    async warmUpBots(accountId: string): Promise<void> {
+      await request('/me/bots/warmup', { method: 'POST', body: { accountId } })
+    },
+    async startBotRun(botId: string, accountId: string): Promise<void> {
+      await request(`/me/bots/${encodeURIComponent(botId)}/start`, { method: 'POST', body: { accountId } })
+    },
+    async stopBotRun(botId: string): Promise<void> {
+      await request(`/me/bots/${encodeURIComponent(botId)}/stop`, { method: 'POST' })
+    },
+    async getBotsLive(): Promise<LiveBots> {
+      return request('/me/bots/live')
     },
 
     // ── Ainda sem servidor (mantidos para as páginas continuarem a compilar) ──
