@@ -40,6 +40,9 @@ services:
         sync: false
       - key: DERIV_OAUTH_REDIRECT_URI
         sync: false
+      # Operar em conta REAL só com "yes". Em "no" os bots só operam na conta demo.
+      - key: DERIV_ALLOW_REAL
+        value: "no"
       # Chave que cifra os tokens guardados: o Render gera um valor aleatório de 256 bits
       # (base64) na primeira sincronização e mantém-no. Não editar nem apagar:
       # trocar a chave torna ilegíveis os tokens já guardados (os utilizadores voltam a fazer login).

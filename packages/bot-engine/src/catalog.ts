@@ -41,6 +41,10 @@ export const RISK_PARAMS: readonly ParamDef[] = [
  * Catálogo de bots do servidor. Só entra aqui quem tem acesso ao repositório.
  * Nenhum bot deste catálogo promete lucro.
  */
+const DIGIT_PARAMS: readonly ParamDef[] = [
+  { kind: "symbol", key: "symbol", label: "Símbolo", help: "Mercado sintético (ex.: R_100).", default: "R_100" },
+];
+
 export const BOT_CATALOG: readonly BotDefinition[] = [
   {
     id: "observador",
@@ -64,6 +68,60 @@ export const BOT_CATALOG: readonly BotDefinition[] = [
         default: "60",
       },
     ],
+  },
+  {
+    id: "digit-3",
+    name: "Dígito 3 (Differs)",
+    summary: "Aposta que o último dígito NÃO é 3.",
+    description:
+      "Compra DIGITDIFF com barreira 3. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
+      "Pode perder dinheiro; nenhum bot garante lucro.",
+    params: DIGIT_PARAMS,
+  },
+  {
+    id: "digit-1",
+    name: "Dígito 1 (Differs)",
+    summary: "Aposta que o último dígito NÃO é 1.",
+    description:
+      "Compra DIGITDIFF com barreira 1. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
+      "Pode perder dinheiro; nenhum bot garante lucro.",
+    params: DIGIT_PARAMS,
+  },
+  {
+    id: "over-5",
+    name: "Acima de 5 (Over 5)",
+    summary: "Aposta que o último dígito é maior que 5.",
+    description:
+      "Compra DIGITOVER com barreira 5. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
+      "Pode perder dinheiro; nenhum bot garante lucro.",
+    params: DIGIT_PARAMS,
+  },
+  {
+    id: "under-8",
+    name: "Abaixo de 8 (Under 8)",
+    summary: "Aposta que o último dígito é menor que 8.",
+    description:
+      "Compra DIGITUNDER com barreira 8. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
+      "Pode perder dinheiro; nenhum bot garante lucro.",
+    params: DIGIT_PARAMS,
+  },
+  {
+    id: "even",
+    name: "Pares (Even)",
+    summary: "Aposta que o último dígito é par.",
+    description:
+      "Compra DIGITEVEN. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
+      "Pode perder dinheiro; nenhum bot garante lucro.",
+    params: DIGIT_PARAMS,
+  },
+  {
+    id: "odd",
+    name: "Ímpares (Odd)",
+    summary: "Aposta que o último dígito é ímpar.",
+    description:
+      "Compra DIGITODD. Contratos de 1 tick: a primeira ordem sai assim que carrega em Play (a ligação à Deriv é preparada antes) e a seguinte logo que a anterior termina, até atingir um limite de risco. " +
+      "Pode perder dinheiro; nenhum bot garante lucro.",
+    params: DIGIT_PARAMS,
   },
 ];
 
